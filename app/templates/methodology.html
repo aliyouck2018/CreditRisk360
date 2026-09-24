@@ -3,89 +3,624 @@
 {% block breadcrumb_current %}Méthodologie{% endblock %}
 
 {% block content %}
-<div class="mb-5">
-    <h1 class="text-[22px] font-bold text-gray-900">Méthodologie &amp; Dictionnaire de données</h1>
-    <p class="text-[13px] text-gray-500">Définitions canoniques, formules et scénarios injectés dans les données synthétiques.</p>
-</div>
 
-<div class="space-y-4">
-    <!-- Definitions -->
-    <div class="rounded-xl border border-card-border bg-white p-5">
-        <h2 class="mb-3 text-[14px] font-semibold text-gray-800">1. Définitions canoniques des indicateurs</h2>
-        <table class="w-full text-[13px]">
-            <thead>
-                <tr class="border-b border-card-border bg-canvas text-left text-[11px] uppercase text-gray-500">
-                    <th class="px-3 py-2 font-semibold">Indicateur</th>
-                    <th class="px-3 py-2 font-semibold">Définition stricte</th>
-                    <th class="px-3 py-2 font-semibold">Implémentation</th>
-                </tr>
-            </thead>
-            <tbody class="text-[12.5px]">
-                <tr class="border-b border-gray-100"><td class="px-3 py-2 font-medium text-gray-700">Exposition</td><td class="px-3 py-2 text-gray-600">Encours restant dû (<code>loans.outstanding_amount</code>), jamais le capital initial.</td><td class="px-3 py-2 text-gray-500"><code>app/metrics.py</code></td></tr>
-                <tr class="border-b border-gray-100"><td class="px-3 py-2 font-medium text-gray-700">Ratio NPL</td><td class="px-3 py-2 text-gray-600">Encours des prêts avec DPD ≥ 90 j / Encours total actif.</td><td class="px-3 py-2 text-gray-500"><code>app/metrics.py</code></td></tr>
-                <tr class="border-b border-gray-100"><td class="px-3 py-2 font-medium text-gray-700">Taux de défaut 12 m</td><td class="px-3 py-2 text-gray-600">Prêts franchissant 90 jours de retard sur 12 derniers mois / actifs 12 mois plus tôt.</td><td class="px-3 py-2 text-gray-500"><code>app/metrics.py</code></td></tr>
-                <tr class="border-b border-gray-100"><td class="px-3 py-2 font-medium text-gray-700">Taux de paiement</td><td class="px-3 py-2 text-gray-600">Σ montants payés / Σ montants échus à la date de référence.</td><td class="px-3 py-2 text-gray-500"><code>app/metrics.py</code></td></tr>
-                <tr class="border-b border-gray-100"><td class="px-3 py-2 font-medium text-gray-700">Score (scorecard)</td><td class="px-3 py-2 text-gray-600">Score = 300 + 550 × Σ(Poids<sub>i</sub> × Sous-score<sub>i</sub>), sous-scores dans [0, 1].</td><td class="px-3 py-2 text-gray-500"><code>app/services/scoring.py</code></td></tr>
-                <tr class="border-b border-gray-100"><td class="px-3 py-2 font-medium text-gray-700">Dossier vierge</td><td class="px-3 py-2 text-gray-600">0 retard sur 24 mois, aucun impayé, aucun défaut, aucune restructuration.</td><td class="px-3 py-2 text-gray-500">—</td></tr>
-                <tr class="border-b border-gray-100"><td class="px-3 py-2 font-medium text-gray-700">Date de référence</td><td class="px-3 py-2 text-gray-600"><code>AS_OF_DATE = 2026-08-31</code> — aucune donnée après cette date.</td><td class="px-3 py-2 text-gray-500">Seed + config</td></tr>
-                <tr><td class="px-3 py-2 font-medium text-gray-700">Concentration</td><td class="px-3 py-2 text-gray-600">HHI = Σ s<sub>i</sub><sup>2</sup> × 10 000 ; limites : secteur ≤ 25 % du pays, emprunteur ≤ 2 %.</td><td class="px-3 py-2 text-gray-500"><code>app/routes/risk.py</code></td></tr>
-            </tbody>
-        </table>
+{% macro deftech(label, body) %}
+<details class="mt-4 rounded-lg border border-gray-100 bg-canvas open:border-primary/30">
+    <summary class="group flex cursor-pointer list-none items-center gap-2 px-4 py-2.5 text-[12px] font-semibold text-primary">
+        <i data-lucide="chevron-right" class="h-3.5 w-3.5 transition group-open:rotate-90"></i>
+        Voir la définition technique — {{ label }}
+    </summary>
+    <div class="border-t border-gray-100 px-4 py-3 text-[12.5px] leading-relaxed text-gray-700">{{ body|safe }}</div>
+</details>
+{% endmacro %}
+
+{% macro accordion(title) %}
+<details class="mt-3 rounded-lg border border-gray-100 open:border-primary/30">
+    <summary class="group flex cursor-pointer list-none items-center gap-2 rounded-lg px-4 py-3 text-[13px] font-semibold text-gray-800 hover:bg-canvas">
+        <i data-lucide="chevron-right" class="h-4 w-4 shrink-0 text-primary transition group-open:rotate-90"></i>
+        {{ title }}
+    </summary>
+    <div class="border-t border-gray-100 px-4 py-4">{{ caller() }}</div>
+</details>
+{% endmacro %}
+
+<!-- ════════════════════════ SECTION 1 — HERO ════════════════════════ -->
+<header class="rounded-xl bg-[#111827] px-6 py-10 text-white md:px-10">
+    <div class="flex flex-wrap items-center gap-3">
+        <h1 class="text-[26px] font-bold md:text-[34px]">Comment fonctionne CreditRisk360 ?</h1>
+        <span class="rounded-full bg-badge-amber-bg px-3 py-1 text-[11px] font-semibold text-badge-amber-fg">
+            DONNÉES SYNTHÉTIQUES — PROJET DE DÉMONSTRATION
+        </span>
+    </div>
+    <p class="mt-4 max-w-3xl text-[15px] leading-relaxed text-gray-300">
+        CreditRisk360 transforme les données de prêts en indicateurs, analyses et alertes
+        qui permettent de mieux comprendre la santé d'un portefeuille de crédit.
+    </p>
+    <p class="mt-3 max-w-3xl text-[12.5px] leading-relaxed text-gray-400">
+        Cette démonstration utilise des données synthétiques conçues pour reproduire des situations
+        plausibles d'analyse du risque de crédit. Aucun portefeuille bancaire réel ni aucune donnée
+        client réelle n'est utilisé.
+    </p>
+</header>
+
+<!-- ═══════════════ SECTION 2 — LE PRINCIPE EN QUELQUES SECONDES ═══════════════ -->
+<section class="mt-12">
+    <h2 id="principe" class="text-[20px] font-bold text-gray-900">Le principe en quelques secondes</h2>
+    <p class="mt-3 max-w-3xl text-[13.5px] text-gray-600">
+        L'idée est simple : une institution financière possède un portefeuille de prêts.
+        CreditRisk360 analyse les informations disponibles sur ces prêts afin d'identifier les
+        tendances, les retards de paiement, les concentrations de risque et les signes de dégradation.
+    </p>
+
+    <div class="mt-6 grid gap-4 md:grid-cols-5">
+        {% set steps = [
+            ("01", "Données", ["Emprunteurs", "Prêts", "Paiements", "Retards", "Secteurs · Pays"], "database", "bg-kpi-blue-bg text-kpi-blue-fg"),
+            ("02", "Analyse", ["Exposition", "Retards (DPD)", "Défauts", "Taux de paiement", "Concentration"], "calculator", "bg-kpi-purple-bg text-kpi-purple-fg"),
+            ("03", "Détection", ["Signaux de risque", "Dégradation de segments", "Anomalies de données", "Concentrations"], "radar", "bg-kpi-amber-bg text-kpi-amber-fg"),
+            ("04", "Alertes", ["Signaux précoces (SAP)", "Score de risque", "Limites réglementaires"], "bell-ring", "bg-kpi-red-bg text-kpi-red-fg"),
+            ("05", "Investigation", ["Emprunteurs concernés", "Segments et prêts", "Décision de l'analyste"], "search", "bg-kpi-green-bg text-kpi-green-fg"),
+        ] %}
+        {% for num, title, items, icon, bg in steps %}
+        <div class="relative flex flex-col rounded-xl border border-card-border bg-white p-4 transition hover:border-primary/40">
+            <div class="flex items-center gap-3">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg {{ bg }} text-[11px] font-bold">{{ num }}</span>
+                <span class="text-[14px] font-bold text-gray-900">{{ title }}</span>
+            </div>
+            <ul class="mt-3 space-y-1.5 text-[12px] text-gray-600">
+                {% for it in items %}
+                <li class="flex items-center gap-1.5"><i data-lucide="chevron-right" class="h-3 w-3 shrink-0 text-gray-300"></i>{{ it }}</li>
+                {% endfor %}
+            </ul>
+            {% if not loop.last %}
+            <span class="hidden xl:block absolute top-1/2 -right-2.5 z-10 flex h-5 w-5 items-center justify-center text-gray-300">→</span>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- ═════════════ SECTION 3 — POURQUOI ANALYSER LE RISQUE ? ═════════════ -->
+<section class="mt-14">
+    <h2 class="text-[20px] font-bold text-gray-900">Pourquoi analyser le risque de crédit ?</h2>
+    <div class="mt-3 max-w-3xl space-y-3 text-[13.5px] leading-relaxed text-gray-600">
+        <p>Lorsqu'une banque ou une institution financière accorde un prêt, elle accepte le risque
+        que l'emprunteur ne rembourse pas comme prévu.</p>
+        <p>L'objectif de l'analyse du risque de crédit n'est donc pas simplement de savoir combien
+        d'argent a été prêté. Il faut également comprendre :</p>
+        <ul class="list-disc space-y-1 pl-5">
+            <li>ce qui reste à rembourser ;</li>
+            <li>quels emprunteurs présentent des retards ;</li>
+            <li>quels secteurs ou pays concentrent le risque ;</li>
+            <li>si la situation se dégrade avec le temps ;</li>
+            <li>quels dossiers méritent une investigation plus approfondie.</li>
+        </ul>
     </div>
 
-    <!-- Dictionary -->
-    <div class="rounded-xl border border-card-border bg-white p-5">
-        <h2 class="mb-3 text-[14px] font-semibold text-gray-800">Dictionnaire de données (tables & vues)</h2>
-        <div class="grid gap-3 md:grid-cols-2 text-[12.5px]">
-            <div class="rounded-lg border border-gray-100 p-3">
-                <p class="font-mono font-semibold text-kpi-purple-fg">v_loans_enriched</p>
-                <p class="mt-1 text-gray-600">Loans + borrowers + institutions + countries (exposition, statut, segment).</p>
+    <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {% set qcards = [
+            ("💰", "Combien avons-nous prêté ?", "L'exposition du portefeuille : ce qui reste engage dans les prêts en cours."),
+            ("⏱️", "Les remboursements arrivent-ils à temps ?", "Les retards et le comportement de paiement des emprunteurs."),
+            ("⚠️", "Où se trouve le risque ?", "Les emprunteurs, secteurs, pays et segments qui concentrent les difficultés."),
+            ("📈", "La situation s'améliore-t-elle ?", "L'évolution temporelle des indicateurs pour repérer les basculements."),
+        ] %}
+        {% for emoji, q, a in qcards %}
+        <div class="rounded-xl border border-card-border bg-white p-5">
+            <div class="text-[20px]">{{ emoji }}</div>
+            <div class="mt-2 text-[13.5px] font-bold text-gray-900">{{ q }}</div>
+            <div class="mt-1.5 text-[12.5px] text-gray-600">{{ a }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- ═══════════════════ SECTION 4 — LES INDICATEURS ═══════════════════ -->
+<section class="mt-14">
+    <h2 id="indicateurs" class="text-[20px] font-bold text-gray-900">Les indicateurs expliqués simplement</h2>
+    <p class="mt-2 max-w-3xl text-[13.5px] text-gray-600">
+        Pour chaque indicateur : la question métier, l'explication, un exemple — puis la
+        définition technique exacte utilisée par l'application, repliable.
+    </p>
+
+    <!-- Indicateur 1 : Exposition -->
+    <article class="mt-8 rounded-xl border border-card-border bg-white p-5 md:p-6">
+        <h3 class="text-[16px] font-bold text-gray-900">💰 Exposition</h3>
+        <p class="mt-2 text-[12.5px] italic text-gray-500">Combien d'argent reste actuellement engagé dans les prêts ?</p>
+        <p class="mt-3 max-w-3xl text-[13.5px] text-gray-700">
+            L'exposition correspond au montant qui reste à rembourser sur les prêts en cours.
+            CreditRisk360 utilise systématiquement cet encours restant — jamais le montant initial du prêt.
+        </p>
+        <div class="mt-4 rounded-lg bg-canvas p-4 text-[13px]">
+            <div class="font-semibold text-gray-600">Exemple</div>
+            <p class="mt-1 text-gray-700">Une banque accorde un prêt de <b>100 M XAF</b>. Le client a déjà remboursé 30 M XAF.
+            L'exposition restante est de <b class="text-kpi-purple-fg">70 M XAF</b>.</p>
+        </div>
+        {% set EXP_TECH %}
+        <p>L'exposition d'un prêt est l'<b>encours restant dû</b>
+        (<code class="rounded bg-white px-1">loans.outstanding_amount</code>), jamais le capital initial.
+        L'exposition du portefeuille est la somme des encours des prêts actifs. Implémentation :
+        <code class="rounded bg-white px-1">app/metrics.py</code>, alimentée par la vue
+        <code class="rounded bg-white px-1">v_loans_enriched</code>.</p>
+        {% endset %}
+        {{ deftech("Exposition", EXP_TECH) }}
+    </article>
+
+    <!-- Indicateur 2 : NPL -->
+    <article class="mt-6 rounded-xl border border-card-border bg-white p-5 md:p-6">
+        <h3 class="text-[16px] font-bold text-gray-900">⚠️ NPL — prêts non performants</h3>
+        <p class="mt-1 text-[11.5px] text-gray-400">NPL = <i>Non-Performing Loan</i> — prêt dont le remboursement est en difficulté.</p>
+        <p class="mt-2 text-[12.5px] italic text-gray-500">Quelle partie du portefeuille présente un niveau de difficulté important ?</p>
+        <p class="mt-3 max-w-3xl text-[13.5px] text-gray-700">
+            Un prêt est considéré comme non performant lorsqu'il présente un retard de paiement important.
+            Dans cette démonstration, le seuil utilisé est de <b>90 jours</b> de retard.
+        </p>
+        <div class="mt-4 rounded-lg bg-canvas p-4 text-[13px]">
+            <div class="font-semibold text-gray-600">Exemple</div>
+            <p class="mt-1 text-gray-700">Si <b>6 M XAF</b> sur <b>100 M XAF</b> d'encours correspondent à des prêts non performants,
+            le ratio NPL est de <b class="text-kpi-red-fg">6 %</b>. À titre d'illustration, le portefeuille de démonstration affiche
+            un NPL autour de <b>5 %</b> à la date de référence.</p>
+        </div>
+        {% set NPL_TECH %}
+        <p><b>NPL Ratio</b> = Σ des encours des prêts dont le retard est ≥ 90 j au mois de référence (statuts actif,
+        défaut, annalisé) divisé par l'exposition des prêts actifs. Sources :
+        <code class="rounded bg-white px-1">loan_monthly</code> (fait mensuel au niveau prêt) et
+        <code class="rounded bg-white px-1">v_kpi_monthly</code> (série mensuelle agrégée).</p>
+        {% endset %}
+        {{ deftech("NPL", NPL_TECH) }}
+    </article>
+
+    <!-- Indicateur 3 : DPD -->
+    <article class="mt-6 rounded-xl border border-card-border bg-white p-5 md:p-6">
+        <h3 class="text-[16px] font-bold text-gray-900">⏱️ DPD — retard de paiement</h3>
+        <p class="mt-1 text-[11.5px] text-gray-400">DPD = <i>Days Past Due</i> — nombre de jours écoulés depuis la date à laquelle un paiement aurait dû être effectué.</p>
+        <p class="mt-3 max-w-3xl text-[13.5px] text-gray-700">
+            Le DPD est la brique de base de toutes les analyses de retard : il permet de savoir si
+            un prêt est à jour, légèrement en retard, ou franchit les seuils de surveillance.
+        </p>
+        <div class="mt-4 grid gap-2 sm:grid-cols-5" title="DPD : nombre de jours de retard d'une échéance impayée">
+            {% set buckets = [
+                ("0 j", "À jour", "bg-badge-green-bg text-badge-green-fg"),
+                ("1-30 j", "Retard", "bg-badge-amber-bg text-badge-amber-fg"),
+                ("31-60 j", "Retard important", "bg-badge-amber-bg text-badge-amber-fg"),
+                ("61-89 j", "Situation préoccupante", "bg-badge-red-bg text-badge-red-fg"),
+                ("90+ j", "Seuil de défaut de la démonstration", "bg-badge-red-bg text-badge-red-fg"),
+            ] %}
+            {% for label, txt, cls in buckets %}
+            <div class="rounded-lg border border-gray-100 p-3 text-center">
+                <div class="text-[13px] font-bold text-gray-900">{{ label }}</div>
+                <div class="mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold {{ cls }}">{{ txt }}</div>
             </div>
-            <div class="rounded-lg border border-gray-100 p-3">
-                <p class="font-mono font-semibold text-kpi-purple-fg">v_kpi_monthly</p>
-                <p class="mt-1 text-gray-600">Encours total, encours NPL et ratio par mois (24 mois glissants).</p>
+            {% endfor %}
+        </div>
+        {% set DPD_TECH %}
+        <p>Chaque paiement porte un <code class="rounded bg-white px-1">days_past_due</code> (paiement − échéance).
+        Un état mensuel par prêt est stocké dans <code class="rounded bg-white px-1">loan_monthly</code> avec un
+        bucket normalisé : <code class="rounded bg-white px-1">CURRENT</code>, <code class="rounded bg-white px-1">1-30</code>,
+        <code class="rounded bg-white px-1">31-60</code>, <code class="rounded bg-white px-1">61-90</code>,
+        <code class="rounded bg-white px-1">90+</code>. Risk Analytics et les alertes SAP exploitent ces buckets.</p>
+        {% endset %}
+        {{ deftech("DPD", DPD_TECH) }}
+    </article>
+
+    <!-- Indicateur 4 : Taux de paiement -->
+    <article class="mt-6 rounded-xl border border-card-border bg-white p-5 md:p-6">
+        <h3 class="text-[16px] font-bold text-gray-900">💳 Taux de paiement</h3>
+        <p class="mt-2 text-[12.5px] italic text-gray-500">Les emprunteurs paient-ils les montants qui arrivent à échéance ?</p>
+        <p class="mt-3 max-w-3xl text-[13.5px] text-gray-700">
+            Cet indicateur compare les montants effectivement payés aux montants qui étaient dus.
+            Un taux proche de 100 % signale un portefeuille à jour à la date de référence.
+        </p>
+        <div class="mt-4 rounded-lg bg-canvas p-4 text-[13px]">
+            <div class="font-semibold text-gray-600">Exemple</div>
+            <p class="mt-1 text-gray-700">Échus à la date de référence : <b>10 M XAF</b>. Payés : <b>9,5 M XAF</b>.
+            Taux de paiement = <b class="text-kpi-green-fg">95 %</b>.</p>
+        </div>
+        {% set PAY_TECH %}
+        <p><b>Taux de paiement</b> = Σ des montants payés / Σ des montants échus à la date de référence
+        (<code class="rounded bg-white px-1">AS_OF_DATE = 2026-08-31</code>), calculé sur les paiements des prêts
+        actifs, clôturés et en défaut.</p>
+        {% endset %}
+        {{ deftech("Taux de paiement", PAY_TECH) }}
+    </article>
+
+    <!-- Indicateur 5 : Défaut -->
+    <article class="mt-6 rounded-xl border border-card-border bg-white p-5 md:p-6">
+        <h3 class="text-[16px] font-bold text-gray-900">🚨 Défaut</h3>
+        <p class="mt-3 max-w-3xl text-[13.5px] text-gray-700">
+            Dans cette démonstration, un prêt bascule en défaut lorsqu'il franchit le seuil de retard
+            défini par la méthodologie (≥ 90 jours de DPD). Il conserve ensuite ce statut jusqu'à la
+            date de référence — c'est aussi la définition utilisée par l'indicateur de taux de défaut
+            sur 12 mois glissants.
+        </p>
+        {% set DEF_TECH %}
+        <p><b>Taux de défaut 12 mois</b> = nombre de prêts (parmi ceux actifs 12 mois plus tôt) qui ont
+        franchi ≥ 90 jours de DPD au cours des 12 derniers mois, divisé par le nombre de prêts
+        actifs 12 mois plus tôt. Calcul sur la table de faits
+        <code class="rounded bg-white px-1">loan_monthly</code>.</p>
+        {% endset %}
+        {{ deftech("Défaut et taux de défaut 12 mois", DEF_TECH) }}
+    </article>
+
+    <!-- Indicateur 6 : Concentration -->
+    <article class="mt-6 rounded-xl border border-card-border bg-white p-5 md:p-6">
+        <h3 class="text-[16px] font-bold text-gray-900">🎯 Concentration du portefeuille</h3>
+        <p class="mt-2 text-[12.5px] italic text-gray-500">Le risque est-il réparti ou concentré sur quelques secteurs, pays ou emprunteurs ?</p>
+        <p class="mt-3 max-w-3xl text-[13.5px] text-gray-700">
+            Imaginez un portefeuille de 100 prêts. Si les prêts sont répartis entre de nombreux
+            secteurs, un problème dans un seul secteur aura un impact limité. Si une grande partie
+            du portefeuille est concentrée dans un seul secteur, le même problème peut avoir un
+            impact bien plus important.
+        </p>
+        <div class="mt-4 rounded-lg bg-canvas p-4">
+            <div class="text-[13px] font-semibold text-gray-700">
+                HHI — <span class="italic font-normal text-gray-500">Herfindahl-Hirschman Index</span>
             </div>
-            <div class="rounded-lg border border-gray-100 p-3">
-                <p class="font-mono font-semibold text-kpi-purple-fg">v_segment_monthly</p>
-                <p class="mt-1 text-gray-600">Agrégation mensuelle par (Pays × Secteur × Type) — entrée du SAP.</p>
+            <p class="mt-1 text-[12.5px] text-gray-700">Le HHI est une mesure statistique utilisée ici pour mesurer
+            le niveau de concentration du portefeuille : plus il est élevé, plus le risque dépend
+            de quelques grandes expositions.</p>
+        </div>
+        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+            <div class="rounded-lg border border-gray-100 p-3 text-[12.5px]">
+                <div class="font-semibold text-gray-700">Limite — secteur unique</div>
+                ≤ 25 % de l'exposition du pays. Au-delà : <span class="font-semibold text-badge-red-fg">DÉPASSEMENT</span>.
             </div>
-            <div class="rounded-lg border border-gray-100 p-3">
-                <p class="font-mono font-semibold text-kpi-purple-fg">v_borrower_metrics</p>
-                <p class="mt-1 text-gray-600">Métriques par emprunteur (dpd max, ratio de paiement, defaults, enquêtes) — entrée du moteur de score.</p>
-            </div>
-            <div class="rounded-lg border border-gray-100 p-3">
-                <p class="font-mono font-semibold text-kpi-purple-fg">loan_monthly</p>
-                <p class="mt-1 text-gray-600">Table de faits mensuelle (outstanding, DPD, bucket) — analyse vintage.</p>
-            </div>
-            <div class="rounded-lg border border-gray-100 p-3">
-                <p class="font-mono font-semibold text-kpi-purple-fg">app_state_dq_resolutions</p>
-                <p class="mt-1 text-gray-600">Workflow de correction DQ (DETECTED → INVESTIGATING → RESOLVED).</p>
+            <div class="rounded-lg border border-gray-100 p-3 text-[12.5px]">
+                <div class="font-semibold text-gray-700">Limite — emprunteur unique</div>
+                ≤ 2 % de l'encours total. Au-delà : <span class="font-semibold text-badge-red-fg">DÉPASSEMENT</span>.
             </div>
         </div>
+        {% set HHI_TECH %}
+        <p><b>HHI</b> = Σ (partᵢ² × 10 000), calculé sur les parts d'exposition par secteur et par pays.
+        Implémentation : <code class="rounded bg-white px-1">app/routes/risk.py</code>. Suivi des limites avec
+        statuts OK (secteur ≤ 20 %, emprunteur ≤ 1,6 %), VIGILANCE, DÉPASSEMENT (&gt; 25 % / &gt; 2 %).</p>
+        {% endset %}
+        {{ deftech("HHI et limites réglementaires", HHI_TECH) }}
+    </article>
+</section>
+
+<!-- ═════════════ SECTION 5 — DU SIGNAL À L'ALERTE ═════════════ -->
+<section class="mt-14">
+    <h2 id="signal" class="text-[20px] font-bold text-gray-900">Comment CreditRisk360 détecte un problème ?</h2>
+    <h3 class="mt-3 text-[14px] font-semibold text-gray-700">Imaginons qu'un portefeuille commence à se dégrader.</h3>
+
+    <div class="mt-6 grid gap-3 md:grid-cols-3">
+        {% set timeline = [
+            ("📋", "1. Les retards augmentent", "Les échéances dépassées et les encours retardés progressent dans un segment (pays × secteur)."),
+            ("🔍", "2. Le segment concerné est identifié", "L'analyse segmentaire repère où la dégradation se produit."),
+            ("⏳", "3. Comparaison avec l'historique", "Le système compare chaque segment à sa situation 6 mois plus tôt."),
+            ("🔔", "4. Un signal est généré", "Une alerte SAP de niveau Élevé ou Modéré est créée avec sa gravité."),
+            ("❓", "5. Explication « Pourquoi ? »", "La dégradation est attribuée : nouveaux prêts, restructurations, détérioration de fond."),
+            ("🧭", "6. L'analyste peut investiguer", "L'analyste examine les emprunteurs et les prêts concernés, l'information peut alimenter une décision d'investigation."),
+        ] %}
+        {% for emoji, t, d in timeline %}
+        <div class="rounded-xl border border-card-border bg-white p-4">
+            <div class="flex items-center gap-2">
+                <span class="text-[16px]">{{ emoji }}</span>
+                <span class="text-[13px] font-bold text-gray-900">{{ t }}</span>
+            </div>
+            <div class="mt-1.5 text-[12px] text-gray-600">{{ d }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    <div class="mt-4 rounded-lg bg-kpi-blue-bg px-4 py-3 text-[12px] text-kpi-blue-fg">
+        <i data-lucide="info" class="mr-1 inline h-3.5 w-3.5"></i>
+        <b>SAP</b> — <i>Système d'Alerte Précoce</i> (en anglais <i>Early-Warning System</i>) : les alertes
+        précoces de CreditRisk360. Le système <b>signale</b> et <b>aide à investiguer</b> ; il ne décide
+        ni n'approuve ni ne refuse automatiquement aucun crédit.
+    </div>
+</section>
+
+<!-- ═════════════ SECTION 6 — SCORE DE RISQUE ═════════════ -->
+<section class="mt-14">
+    <h2 id="score" class="text-[20px] font-bold text-gray-900">Comment fonctionne le score de risque ?</h2>
+    <p class="mt-3 max-w-3xl text-[13.5px] text-gray-600">
+        Un score de risque résume plusieurs caractéristiques d'un emprunteur dans un indicateur unique.
+        CreditRisk360 combine plusieurs facteurs liés au comportement de crédit afin de produire un
+        <b>score explicable</b>, compris entre 300 et 850.
+    </p>
+
+    <div class="mt-5 flex flex-wrap items-center justify-center gap-2.5 rounded-xl border border-card-border bg-white p-6">
+        {% set pills = [
+            ("Historique de paiement", "bg-kpi-green-bg text-kpi-green-fg"),
+            ("Retards", "bg-kpi-amber-bg text-kpi-amber-fg"),
+            ("Défauts", "bg-kpi-red-bg text-kpi-red-fg"),
+            ("Restructurations", "bg-kpi-purple-bg text-kpi-purple-fg"),
+            ("Niveau d'endettement", "bg-kpi-blue-bg text-kpi-blue-fg"),
+            ("Ancienneté · Demandes", "bg-kpi-green-bg text-kpi-green-fg"),
+        ] %}
+        {% for label, cls in pills %}
+        <span class="rounded-full px-3 py-1.5 text-[12px] font-medium {{ cls }}">{{ label }}</span>
+        {% if not loop.last %}<span class="text-gray-300">+</span>{% endif %}
+        {% endfor %}
+        <span class="text-gray-400">→</span>
+        <span class="rounded-xl bg-[#111827] px-4 py-2 text-[15px] font-bold text-white">SCORE 300-850</span>
+    </div>
+    <p class="mt-3 text-[12.5px] text-gray-600">
+        L'objectif n'est pas de remplacer l'analyse humaine, mais de fournir un indicateur
+        <b>comparable et interprétable</b>: chaque contribution est détaillée sur la fiche de chaque
+        emprunteur et sur la page <a href="{{ url_for('scoring.index') }}" class="text-primary hover:underline">Scoring explicable</a>.
+    </p>
+
+    {% call accordion("🔬 Pour les lecteurs techniques — voir le calcul détaillé") %}
+    <div class="text-[12.5px] leading-relaxed text-gray-700">
+        <p class="font-semibold">Formule canonique</p>
+        <div class="mt-2 rounded-lg bg-canvas p-3 font-mono text-[12px]">
+            Score = 300 + 550 × Σ (Poidsᵢ × Sous-scoreᵢ), avec Sous-scoreᵢ ∈ [0, 1]
+        </div>
+        <p class="mt-3 font-semibold">Poids des sous-scores</p>
+        <ul class="mt-1 list-disc space-y-1 pl-5">
+            <li>Historique de paiement — <b>0,35</b> (ratio payé/échu 12 m, pénalisé par le DPD récent)</li>
+            <li>Niveau d'endettement — <b>0,20</b> (encours comparé à une capacité dépendant du type d'emprunteur)</li>
+            <li>Antécédents de défaut — <b>0,15</b> (défauts et restructurations passées)</li>
+            <li>Ancienneté de relation — <b>0,10</b> (plafonnée à 8 ans)</li>
+            <li>Nouveaux crédits — <b>0,10</b> (prêts ouverts depuis moins de 6 mois)</li>
+            <li>Pression des demandes — <b>0,10</b> (consultations bureautiques sur 12 mois)</li>
+        </ul>
+        <p class="mt-3 font-semibold">Bande de risque du score final</p>
+        <p class="mt-1">Faible ≥ 730 · Modéré ≥ 650 · Élevé ≥ 570 · Très Élevé &lt; 570.</p>
+        <p class="mt-3 font-semibold">Contributions</p>
+        <p class="mt-1">Chaque facteur produit <code class="rounded bg-white px-1">550 × poids × sous-score</code>
+        points, comparés au profil moyen du portefeuille (les sous-scores moyens sont calculés sur un
+        échantillon d'emprunteurs). Entrées : vue <code class="rounded bg-white px-1">v_borrower_metrics</code>.</p>
+    </div>
+    {% endcall %}
+</section>
+
+<!-- ═════════════ SECTION 7 — QUALITÉ DES DONNÉES ═════════════ -->
+<section class="mt-14">
+    <h2 class="text-[20px] font-bold text-gray-900">Avant d'analyser le risque, il faut pouvoir faire confiance aux données</h2>
+    <p class="mt-3 max-w-3xl text-[13.5px] text-gray-600">
+        Une analyse de risque n'est fiable que si les données utilisées sont suffisamment cohérentes.
+        Une échéance incohérente, un montant négatif ou un statut incorrect peut fausser les indicateurs.
+        CreditRisk360 intègre donc une couche de <b>Data Quality</b> pour identifier et suivre certains problèmes.
+    </p>
+
+    <div class="mt-6 grid gap-3 sm:grid-cols-3">
+        {% set dqflow = [
+            ("🔍", "Détection", "10 règles automatisées : dates manquantes, doublons, encours négatifs, incohérences…"),
+            ("🧭", "Investigation", "Chaque anomalie est suivie : elle passe du statut « détecté » à « en investigation »."),
+            ("✅", "Résolution", "Certaines anomalies peuvent être corrigées automatiquement, puis les scores recalculés en direct."),
+        ] %}
+        {% for emoji, t, d in dqflow %}
+        <div class="rounded-xl border border-card-border bg-white p-4 text-center">
+            <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-canvas text-lg">{{ emoji }}</span>
+            <div class="mt-2 text-[13.5px] font-bold text-gray-900">{{ t }}</div>
+            <div class="mt-1 text-[12px] text-gray-600">{{ d }}</div>
+        </div>
+        {% endfor %}
     </div>
 
-    <!-- Scenario -->
-    <div class="rounded-xl border border-card-border bg-white p-5">
-        <h2 class="mb-3 text-[14px] font-semibold text-gray-800">Scénarios synthétiques injectés</h2>
-        <div class="grid gap-3 md:grid-cols-3 text-[12.5px]">
-            <div class="rounded-lg border border-gray-100 p-3">
-                <p class="font-semibold text-gray-800">S1 — Dérive BTP Cameroun</p>
-                <p class="mt-1 text-gray-600">Grille de retards ≥ 30 jours sur les prêts récents du segment (visible sur l'onglet Alertes SAP).</p>
+    {% call accordion("Détails techniques — les 10 règles DQ-01 … DQ-10") %}
+    <div class="text-[12.5px] text-gray-700">
+        <div class="grid gap-2.5 md:grid-cols-2">
+            <div><span class="font-semibold">Complétude</span>
+                <ul class="mt-1 list-disc pl-5"><li>DQ-01 — dates manquantes (octroi / échéance / taux)</li>
+                <li>DQ-09 — champs d'emprunteur manquants (pays, date d'inscription)</li></ul></div>
+            <div><span class="font-semibold">Validité</span>
+                <ul class="mt-1 list-disc pl-5"><li>DQ-03 — encours négatifs</li>
+                <li>DQ-04 — échéance antérieure à la date d'octroi</li>
+                <li>DQ-06 — DPD incohérent avec son bucket</li>
+                <li>DQ-08 — taux d'intérêt hors plage [1 %; 25 %]</li></ul></div>
+            <div><span class="font-semibold">Unicité</span>
+                <ul class="mt-1 list-disc pl-5"><li>DQ-02 — doublons d'emprunteurs (même profil)</li></ul></div>
+            <div><span class="font-semibold">Cohérence</span>
+                <ul class="mt-1 list-disc pl-5"><li>DQ-05 — prêts clôturés avec encours résiduel</li>
+                <li>DQ-07 — paiements postérieurs à la date de référence</li>
+                <li>DQ-10 — octroi antérieur à l'inscription de l'emprunteur</li></ul></div>
+        </div>
+        <p class="mt-3">Chaque règle calcule un score (100 − 2 × anomalies détectées), le score global = moyenne des
+        4 dimensions sur 100. Corrections automatiques disponibles pour les cas simples : encours négatif
+        → valeur absolue, clôturé avec encours → 0, paiement postérieur → rattaché à la date de référence.
+        Le statut des dossiers est persisté dans <code class="rounded bg-white px-1">app_state_dq_resolutions</code>
+        et le bouton « Relancer la validation » recalcule les scores en direct.</p>
+    </div>
+    {% endcall %}
+</section>
+
+<!-- ═════════════ SECTION 8 — EXEMPLE COMPLET ═════════════ -->
+<section class="mt-14 rounded-xl bg-gradient-to-br from-white to-kpi-purple-bg p-6 md:p-8">
+    <span class="rounded-full bg-kpi-purple-bg px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-kpi-purple-fg">Exemple pédagogique</span>
+    <h2 class="mt-3 text-[20px] font-bold text-gray-900">Détecter une dégradation du portefeuille</h2>
+    <p class="mt-2 max-w-3xl text-[13px] text-gray-600">
+        Scénario cohérent avec les données synthétiques réellement présentes dans la démonstration :
+        la dérive des prêts récents du segment <b>BTP Cameroun</b> (scénario « S1 ») — à voir aussi,
+        en chiffres, sur le module <a href="{{ url_for('alerts.index') }}" class="text-primary hover:underline">Alertes (SAP)</a>.
+    </p>
+
+    <div class="mt-6 grid gap-3 md:grid-cols-5">
+        {% set story = [
+            ("Situation initiale", "Le portefeuille semble stable : ~84,8 Md XAF d'encours, NPL ~5 %.", "layers"),
+            ("Nouveau signal", "Les retards augmentent dans un segment particulier (BTP, Cameroun).", "trending-up"),
+            ("Analyse", "Le segment évolue : la dérive des prêts récents est identifiée face à l'historique.", "search-code"),
+            ("Investigation", "L'analyste examine les emprunteurs concernés, l'exposition, les retards, l'historique et la concentration.", "user-search"),
+            ("Résultat", "Il dispose d'informations supplémentaires pour décider de son degré d'analyse.", "flag"),
+        ] %}
+        {% for t, d, icon in story %}
+        <div class="rounded-xl border border-card-border bg-white p-4">
+            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-kpi-purple-bg">
+                <i data-lucide="{{ icon }}" class="h-4 w-4 text-kpi-purple-fg"></i>
             </div>
-            <div class="rounded-lg border border-gray-100 p-3">
-                <p class="font-semibold text-gray-800">S2 — Emprunteur > 2 %% / secteur Tchad > 25 %%</p>
-                <p class="mt-1 text-gray-600">Borrower unique et concentration secteur (Risk Analytics, limites réglementaires).</p>
-            </div>
-            <div class="rounded-lg border border-gray-100 p-3">
-                <p class="font-semibold text-gray-800">S3 — Cohortes 2025 dégradées</p>
-                <p class="mt-1 text-gray-600">Taux de défaut 12 m plus élevé pour les cohortes 2025 (courbes vintage).</p>
-            </div>
+            <div class="mt-2 text-[12px] font-bold text-gray-900">{{ loop.index }}. {{ t }}</div>
+            <div class="mt-1 text-[11.5px] text-gray-600">{{ d }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    <p class="mt-4 text-[11.5px] text-gray-500">
+        Il s'agit d'un <b>exemple pédagogique</b> construit sur des données synthétiques — ce n'est ni
+        une prédiction, ni une situation bancaire réelle.
+    </p>
+</section>
+
+<!-- ═════════════ SECTION 9 — DONNÉES UTILISÉES ═════════════ -->
+<section class="mt-14">
+    <h2 class="text-[20px] font-bold text-gray-900">Quelles données utilise CreditRisk360 ?</h2>
+    <div class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        {% set datacards = [
+            ("👤", "Emprunteurs", "12 021 dossiers", "Type, pays, secteur, date d'inscription", "bg-kpi-purple-bg text-kpi-purple-fg"),
+            ("💰", "Prêts", "20 000 facilités", "Montants, dates, statuts, taux, garanties", "bg-kpi-green-bg text-kpi-green-fg"),
+            ("💳", "Paiements", "378 255 échéances", "Montants dus et payés, dates", "bg-kpi-blue-bg text-kpi-blue-fg"),
+            ("⏱️", "Retards", "378 255 faits mensuels", "Jours de retard (DPD) par prêt et historique", "bg-kpi-amber-bg text-kpi-amber-fg"),
+            ("🔍", "Demandes", "15 917 consultations", "Interrogations bureautiques des institutions", "bg-kpi-blue-bg text-kpi-blue-fg"),
+        ] %}
+        {% for emoji, t, n, d, cls in datacards %}
+        <div class="rounded-xl border border-card-border bg-white p-4">
+            <div class="flex h-9 w-9 items-center justify-center rounded-lg {{ cls }} text-[15px]">{{ emoji }}</div>
+            <div class="mt-2 text-[13px] font-bold text-gray-900">{{ t }}</div>
+            <div class="mt-0.5 text-[15px] font-extrabold text-gray-800">{{ n }}</div>
+            <div class="mt-1 text-[11.5px] text-gray-500">{{ d }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    <p class="mt-4 max-w-3xl text-[12.5px] text-gray-600">
+        Les données utilisées dans cette démonstration sont <b>synthétiques</b> : elles ont été conçues
+        pour reproduire des situations plausibles d'analyse de crédit sans utiliser de données bancaires
+        réelles. Segmentation disponible : 6 pays CEMAC (Cameroun, Tchad, Gabon, Congo, Guinée
+        équatoriale, Centrafrique), 8 secteurs, 3 types d'emprunteur.
+    </p>
+</section>
+
+<!-- ═════════════ SECTION 10 — MÉTHODOLOGIE TECHNIQUE ═════════════ -->
+<section class="mt-14 rounded-xl border border-card-border bg-white p-6 md:p-8">
+    <h2 id="technique" class="text-[22px] font-bold text-gray-900">Méthodologie technique</h2>
+    <p class="mt-1 text-[13px] text-gray-500">
+        Pour les lecteurs qui souhaitent comprendre précisément les calculs utilisés par CreditRisk360.
+    </p>
+
+    {% call accordion("1. Définitions canoniques des indicateurs") %}
+    <table class="w-full text-left text-[12.5px] text-gray-700">
+        <thead>
+            <tr class="text-[10.5px] uppercase text-gray-400">
+                <th class="py-1 font-semibold">Indicateur</th>
+                <th class="py-1 font-semibold">Définition stricte</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr class="border-t border-gray-100"><td class="py-1.5 pr-3 font-semibold">Exposition</td><td class="py-1.5">Encours restant dû (<code>loans.outstanding_amount</code>), jamais le capital initial</td></tr>
+            <tr class="border-t border-gray-100"><td class="py-1.5 pr-3 font-semibold">Ratio NPL</td><td class="py-1.5">Encours des prêts de statut actif / défaut / annulé dont DPD ≥ 90 j au mois de référence / exposition des actifs</td></tr>
+            <tr class="border-t border-gray-100"><td class="py-1.5 pr-3 font-semibold">Taux de défaut 12 m</td><td class="py-1.5">Prêts franchissant ≥ 90 j DPD sur les 12 derniers mois / prêts actifs 12 mois plus tôt</td></tr>
+            <tr class="border-t border-gray-100"><td class="py-1.5 pr-3 font-semibold">Taux de paiement</td><td class="py-1.5">Σ montants payés / Σ montants échus ≤ à la date de référence</td></tr>
+            <tr class="border-t border-gray-100"><td class="py-1.5 pr-3 font-semibold">DPD</td><td class="py-1.5">Jours de retard d'une échéance ; buckets CURRENT / 1-30 / 31-60 / 61-90 / 90+</td></tr>
+            <tr class="border-t border-gray-100"><td class="py-1.5 pr-3 font-semibold">Dossier vierge</td><td class="py-1.5">0 retard sur 24 mois, aucun impayé, aucun défaut, aucune restructuration (référence du scoring)</td></tr>
+            <tr class="border-t border-gray-100"><td class="py-1.5 pr-3 font-semibold">Date de référence</td><td class="py-1.5"><code>AS_OF_DATE = 2026-08-31</code> — aucune donnée au-delà (vérifié par les tests)</td></tr>
+        </tbody>
+    </table>
+    {% endcall %}
+
+    {% call accordion("2. Formules") %}
+    <div class="grid gap-3 md:grid-cols-2 text-[12.5px] text-gray-700">
+        <div class="rounded-lg bg-canvas p-3"><code>NPL Ratio = Σ(encours | DPD ≥ 90) / Σ(encours actifs) × 100</code>
+            <p class="mt-1 text-[11px] text-gray-500">implémentation : <code>app/metrics.py</code>, vue <code>v_kpi_monthly</code></p></div>
+        <div class="rounded-lg bg-canvas p-3"><code>Défaut 12 m = Σ(prêts franchissant 90 j sur 12 m) / COUNT(actifs 12 m) × 100</code>
+            <p class="mt-1 text-[11px] text-gray-500">dérivation glissante sur 12 mois depuis <code>loan_monthly</code></p></div>
+        <div class="rounded-lg bg-canvas p-3"><code>Taux de paiement = Σ(amount_paid | due ≤ AS_OF) / Σ(amount_due | due ≤ AS_OF) × 100</code>
+            <p class="mt-1 text-[11px] text-gray-500">cumul des échéances échues uniquement</p></div>
+        <div class="rounded-lg bg-canvas p-3"><code>HHI = Σ sᵢ² × 10 000 ; limite secteur ≤ 25 %, emprunteur ≤ 2 %</code>
+            <p class="mt-1 text-[11px] text-gray-500">contrôle de concentration (Risk Analytics)</p></div>
+        <div class="rounded-lg bg-canvas p-3"><code>Score = 300 + 550 × Σ wᵢ·sᵢ ; wᵢ ∈ {0,35 ; 0,20 ; 0,15 ; 0,10 ; 0,10 ; 0,10}</code>
+            <p class="mt-1 text-[11px] text-gray-500">scorecard explicable (voir section 6 de cette page)</p></div>
+        <div class="rounded-lg bg-canvas p-3"><code>EL (perte attendue) = NPL × LGD (55 %) + {(encours sain : PD) × LGD}</code>
+            <p class="mt-1 text-[11px] text-gray-500">métrique de la comparaison Base vs Stress du simulateur</p></div>
+    </div>
+    {% endcall %}
+
+    {% call accordion("3. Sources de données — tables et vues SQL") %}
+    <div class="grid gap-2.5 md:grid-cols-2 text-[12.5px] text-gray-700">
+        <div class="rounded-lg border border-gray-100 p-3"><p class="font-mono font-semibold text-kpi-purple-fg">v_loans_enriched</p>
+            <p class="mt-1 text-gray-600">Prêts enrichis — statut, segment (pays, secteur, type d'emprunteur), institution.</p></div>
+        <div class="rounded-lg border border-gray-100 p-3"><p class="font-mono font-semibold text-kpi-purple-fg">v_kpi_monthly</p>
+            <p class="mt-1 text-gray-600">Agrège les principaux indicateurs du portefeuille par période (encours, encours NPL, ratio).</p></div>
+        <div class="rounded-lg border border-gray-100 p-3"><p class="font-mono font-semibold text-kpi-purple-fg">v_segment_monthly</p>
+            <p class="mt-1 text-gray-600">Agrégation mensuelle par Pays × Secteur × Taille — entrée du moteur d'alertes SAP.</p></div>
+        <div class="rounded-lg border border-gray-100 p-3"><p class="font-mono font-semibold text-kpi-purple-fg">v_borrower_metrics</p>
+            <p class="mt-1 text-gray-600">Métriques par emprunteur (retard max, ratio de paiement 12 m, défauts, restructurations, demandes) — entrée du scoring.</p></div>
+        <div class="rounded-lg border border-gray-100 p-3"><p class="font-mono font-semibold text-kpi-purple-fg">loan_monthly</p>
+            <p class="mt-1 text-gray-600">Table de faits mensuelle au niveau du prêt (encours, DPD, tranche de retard) — base de l'analyse *vintage* analytiquement postérieures.</p></div>
+        <div class="rounded-lg border border-gray-100 p-3"><p class="font-mono font-semibold text-kpi-purple-fg">app_state_dq_resolutions</p>
+            <p class="mt-1 text-gray-600">État applicatif du workflow de qualité des données (détecté → restructuration → corrigé).</p></div>
+    </div>
+    {% endcall %}
+
+    {% call accordion("4. Hypothèses méthodologiques") %}
+    <table class="w-full text-left text-[12.5px] text-gray-700">
+        <thead><tr class="text-[10.5px] uppercase text-gray-400">
+            <th class="py-1 font-semibold">Hypothèse</th><th class="py-1 font-semibold">Valeur / règle</th><th class="py-1 font-semibold">Pourquoi ?</th>
+        </tr></thead>
+        <tbody>
+            <tr class="border-t border-gray-100"><td class="py-1.5 pr-3">Date de référence unique</td><td class="py-1.5">2026-08-31</td><td class="py-1.5">Point de lecture unique du portefeuille, aucune donnée au-delà (vérifié par les tests)</td></tr>
+            <tr class="border-t border-gray-100"><td class="py-1.5 pr-3">Seuil NPL / défaut</td><td class="py-1.5">DPD ≥ 90 jours</td><td class="py-1.5">Standard de la démonstration ; les définitions internes d'une institution peuvent différer</td></tr>
+            <tr class="border-t border-gray-100"><td class="py-1.5 pr-3">LGD (perte en cas de défaut)</td><td class="py-1.5">55 %</td><td class="py-1.5">Paramètre simple et explicite, ajustable depuis le simulateur de stress</td></tr>
+            <tr class="border-t border-gray-100"><td class="py-1.5 pr-3">Sensibilité aux taux</td><td class="py-1.5">+1,2 % de migration en défaut par point de taux</td><td class="py-1.5">Hypothèse pédagogique du simulateur de stress-test</td></tr>
+            <tr class="border-t border-gray-100"><td class="py-1.5 pr-3">Granularité d'analyse</td><td class="py-1.5">Pays × Secteur × Taille (particulier / PME / entreprise)</td><td class="py-1.5">Utilisée pour la détection SAP et le suivi des limites réglementaires</td></tr>
+            <tr class="border-t border-gray-100"><td class="py-1.5 pr-3">Score d'ancienneté</td><td class="py-1.5">Plafonné à 8 ans</td><td class="py-1.5">Simplification : l'historique côté bureau n'excède pas l'implémentation du portefeuille de démonstration</td></tr>
+            <tr class="border-t border-gray-100"><td class="py-1.5 pr-3">Reproductibilité</td><td class="py-1.5">Seed = 42, génération déterministe</td><td class="py-1.5">Même jeu de données à chaque génération, idempotent</td></tr>
+        </tbody>
+    </table>
+    {% endcall %}
+
+    {% call accordion("5. Scénarios injectés dans les données synthétiques") %}
+    <div class="grid gap-3 md:grid-cols-3 text-[12.5px]">
+        <div class="rounded-lg border border-gray-100 p-3">
+            <p class="font-semibold text-gray-800">S1 — Dérive des prêts récents Cameroun · BTP</p>
+            <p class="mt-1 text-gray-600">Retards de 35 à 75 jours sur les prêts récents du segment — visible comme dérive dans l'onglet Alertes (SAP).</p>
+        </div>
+        <div class="rounded-lg border border-gray-100 p-3">
+            <p class="font-semibold text-gray-800">S2 — Concentration Tchad</p>
+            <p class="mt-1 text-gray-600">Un emprunteur unique &gt; 2 % de l'encours et le secteur Mines &amp; Pétrole &gt; 25 % de l'exposition du pays — visibles dans Risk Analytics.</p>
+        </div>
+        <div class="rounded-lg border border-gray-100 p-3">
+            <p class="font-semibold text-gray-800">S3 — Cohortes 2025 fragiles</p>
+            <p class="mt-1 text-gray-600">Fréquence de défaut par cohorte trimestrielle plus élevée pour 2025 (~2× vs 2023-2024) — visible en analytique vintage (Heatmap).</p>
         </div>
     </div>
+    {% endcall %}
+</section>
 
-    <div class="rounded-xl bg-kpi-purple-bg px-5 py-4 text-[12px] text-kpi-purple-fg">
-        <i data-lucide="flask-conical" class="mr-1 inline h-3.5 w-3.5"></i>
-        <b>Note :</b> 100 %% des données (emprunteurs, prêts, paiements, consultations, anomalies DQ) sont générées de façon déterministe par <code>seed_supabase.py</code> (graine = 42), as-of 31/08/2026.
+<!-- ═════════════ SECTION 11 — LIMITES ═════════════ -->
+<section class="mt-14">
+    <h2 id="limites" class="text-[20px] font-bold text-gray-900">Ce que cette démonstration ne prétend pas faire</h2>
+    <div class="mt-5 grid gap-3 md:grid-cols-2">
+        {% set limits = [
+            ("Les données sont 100 % synthétiques", "Générées de façon déterministe pour la démonstration — aucun portefeuille réel, aucune statistique officielle."),
+            ("Pas de décision automatique de crédit", "CreditRisk360 aide à identifier et à investiguer ; il n'approuve ni refuse aucun dossier."),
+            ("Scores démonstratifs", "Le score vise l'expliabilité et la comparabilité, pas une prévision calibrée."),
+            ("Règles pouvant différer des internes", "Seuils (90 j, 25 %, 2 %), LGD, sensibilités : ajustables selon le règlement visé et les pratiques de l'institution."),
+            ("Pas de gouvernance complète", "Aucune exigence de validation de modèles, de comité de gestion, d'audit contrôles n'est couverte."),
+            ("Données réelles nécessaires", "Un environnement bancaire réel exigerait des données auditées et un suivi de qualité permanent."),
+        ] %}
+        {% for t, d in limits %}
+        <div class="flex gap-3 rounded-xl border border-card-border bg-white p-4">
+            <i data-lucide="shield-alert" class="mt-0.5 h-4 w-4 shrink-0 text-kpi-amber-fg"></i>
+            <div>
+                <div class="text-[13px] font-bold text-gray-900">{{ t }}</div>
+                <div class="mt-0.5 text-[12px] text-gray-600">{{ d }}</div>
+            </div>
+        </div>
+        {% endfor %}
     </div>
-</div>
+</section>
+
+<!-- ═════════════ SECTION 12 — CALL TO ACTION ═════════════ -->
+<section class="mt-14 rounded-xl bg-[#111827] px-6 py-10 md:px-10">
+    <h2 id="explorer" class="text-[22px] font-bold text-white">Explorer CreditRisk360</h2>
+    <p class="mt-2 max-w-3xl text-[13.5px] text-gray-300">
+        Maintenant que vous comprenez comment fonctionne la méthodologie, explorez les différents
+        modules pour voir comment ces concepts sont utilisés dans l'application.
+    </p>
+    <div class="mt-6 flex flex-wrap gap-3">
+        {% set ctas = [
+            ("Tableau de bord", "main.dashboard", "bar-chart-3"),
+            ("Clients", "borrowers.borrower_list", "users"),
+            ("Risk Analytics", "risk.index", "target"),
+            ("Score explicable", "scoring.index", "gauge"),
+            ("Alertes (SAP)", "alerts.index", "alert-triangle"),
+            ("Stress-Test", "simulator.index", "sliders-horizontal"),
+            ("Analyste IA", "analyst.index", "bot"),
+        ] %}
+        {% for label, endpoint, icon in ctas %}
+        <a href="{{ url_for(endpoint) }}"
+           class="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-4 py-2.5 text-[13px] font-medium text-white transition hover:border-primary hover:bg-primary">
+            <i data-lucide="{{ icon }}" class="h-4 w-4"></i> {{ label }}
+        </a>
+        {% endfor %}
+    </div>
+</section>
 {% endblock %}
