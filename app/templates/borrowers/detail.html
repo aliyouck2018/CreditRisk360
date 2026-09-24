@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}{{ borrower.display_name }} — {{ app_name }}{% endblock %}
+{% block breadcrumb %}
+<a href="{{ url_for('main.dashboard') }}" class="hidden text-gray-400 hover:text-gray-600 sm:inline">CreditRisk360</a>
+<i data-lucide="chevron-right" class="hidden h-3 w-3 text-gray-300 sm:inline"></i>
+<a href="{{ url_for('borrowers.borrower_list') }}" class="text-gray-400 hover:text-gray-600">Clients</a>
+<i data-lucide="chevron-right" class="h-3 w-3 text-gray-300"></i>
+<span class="truncate font-medium text-gray-700">{{ borrower.display_name }}</span>
+{% endblock %}
+
+{% set band_colors = {'Faible': ('bg-badge-green-bg','text-badge-green-fg'),
+                      'Modéré': ('bg-badge-blue-bg','text-badge-blue-fg'),
+                      'Élevé': ('bg-badge-amber-bg','text-badge-amber-fg'),
+                      'Très Élevé': ('bg-badge-red-bg','text-badge-red-fg')}
+%}
+{% set bc = band_colors.get(score.risk_band, ('bg-gray-100','text-gray-500')) %}
+
+{% block content %}
+<!-- Header -->
+<div class="rounded-xl border border-card-border bg-white p-6" x-data>
+    <div class="flex flex-wrap items-start justify-between gap-4">
+        <div class="flex items-start gap-4">
+            <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-kpi-purple-bg text-lg font-bold text-kpi-purple-fg">
+                {{ borrower.display_name[:2]|upper }}
+            </div>
+            <div>
+                <h1 class="text-[20px] font-bold text-gray-900">{{ borrower.display_name }}</h1>
+                <div class="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-gray-500">
+                    <span>{{ legal_form }}</span>·<span>{{ borrower.country_full or 'Pays inconnu' }}</span>·
+                    <span>{{ {'INDIVIDUAL':'Particulier','SME':'PME','CORPORATE':'Entreprise'}[borrower.borrower_type] }}</span>·
+                    <span>Secteur {{ borrower.sector }}</span>·
+                    <span>Inscrit {{ borrower.registration_date.strftime('%m/%Y') if borrower.registration_date else 'n/d' }}</span>
+                    {% set meta = demo_meta.get(borrower.borrower_id) %}
+                    {% if meta %}<span class="rounded-full px-2 py-0.5 text-[10px] font-semibold {{ meta[2] }} {{ meta[1] }}">{{ meta[0] }}</span>{% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <a href="{{ url_for('borrowers.borrower_pdf', borrower_id=borrower.borrower_id) }}"
+               class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-primary-hover transition">
+                <i data-lucide="file-text" class="h-4 w-4"></i> Générer Rapport de Crédit PDF
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Score + risk band + exposure summary -->
+<div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
+    <!-- Explicable score -->
+    <div class="rounded-xl border border-card-border bg-white p-5">
+        <h2 class="text-[14px] font-semibold text-gray-800">Score de crédit explicable</h2>
+        <div class="mt-4 flex items-center gap-4">
+            <div class="relative">
+                <div class="text-[34px] font-extrabold leading-none {{ bc[1] }}">{{ score.score }}</div>
+                <div class="text-[11px] text-gray-400">sur 300 – 850</div>
+            </div>
+            <div class="ml-auto text-right">
+                <span class="inline-block rounded-full px-3 py-1 text-[12px] font-semibold {{ bc[0] }} {{ bc[1] }}">{{ score.risk_band }}</span>
+                <div class="mt-1 text-[11px] text-gray-400">Bande de risque</div>
+            </div>
+        </div>
+        <div class="mt-3 h-2 w-full rounded-full bg-canvas">
+            {% set pct = ((score.score - 300) / 550 * 100)|round(0, 'floor') %}
+            {% set band_hex = {'Faible': '#16A34A', 'Modéré': '#0284C7', 'Élevé': '#D97706', 'Très Élevé': '#DC2626'}[score.risk_band] %}
+            <div class="h-2 rounded-full" style="width: {{ pct }}%; background: {{ band_hex }};"></div>
+        </div>
+        <!-- contribution breakdown -->
+        <div class="mt-5 divide-y divide-gray-100">
+            {% for c in score.contributions %}
+            <div class="flex items-center gap-2 py-1.5 text-[12px]">
+                <span class="w-40 flex-shrink-0 text-gray-600">{{ c.label }}</span>
+                <span class="{{ 'text-kpi-green-fg' if c.delta >= 0 else 'text-kpi-red-fg' }} font-semibold">
+                    {{ '%+d' % c.delta }} pts
+                </span>
+                <span class="ml-auto text-gray-400">vs portefeuille {{ c.points }} / {{ c.portfolio_avg_points }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Exposure summary -->
+    <div class="rounded-xl border border-card-border bg-white p-5">
+        <h2 class="text-[14px] font-semibold text-gray-800">Exposition &amp; encours</h2>
+        <div class="mt-4 space-y-4 text-[13px]">
+            <div class="flex items-center gap-4">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-kpi-purple-bg"><i data-lucide="wallet" class="h-4 w-4 text-kpi-purple-fg"></i></div>
+                <div>
+                    <div class="text-[11px] text-gray-400">Encours total</div>
+                    <div class="text-[17px] font-bold text-gray-900">{{ metrics.total_outstanding|xaf }}</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-kpi-blue-bg"><i data-lucide="building" class="h-4 w-4 text-kpi-blue-fg"></i></div>
+                <div>
+                    <div class="text-[11px] text-gray-400">Institutions / prêts actifs</div>
+                    <div class="text-[17px] font-bold text-gray-900">{{ metrics.n_institutions or 0 }} · {{ metrics.n_active_loans or 0 }}</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg
+                            {% if metrics.paid_ratio_12m and metrics.paid_ratio_12m < 0.9 %}bg-kpi-red-bg{% else %}bg-kpi-green-bg{% endif %}">
+                    <i data-lucide="check-circle" class="h-4 w-4 {% if metrics.paid_ratio_12m and metrics.paid_ratio_12m < 0.9 %}text-kpi-red-fg{% else %}text-kpi-green-fg{% endif %}"></i>
+                </div>
+                <div>
+                    <div class="text-[11px] text-gray-400">Taux de paiement 12 m</div>
+                    <div class="text-[17px] font-bold text-gray-900">{{ '%.1f %%'|format((metrics.paid_ratio_12m or 1) * 100) }}</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg
+                            {% if metrics.n_defaults %}bg-kpi-red-bg{% else %}bg-kpi-green-bg{% endif %}">
+                    <i data-lucide="bug" class="h-4 w-4 {% if metrics.n_defaults %}text-kpi-red-fg{% else %}text-kpi-green-fg{% endif %}"></i>
+                </div>
+                <div>
+                    <div class="text-[11px] text-gray-400">Défauts / restructurations</div>
+                    <div class="text-[17px] font-bold text-gray-900">{{ metrics.n_defaults or 0 }} · {{ metrics.restructured_loans or 0 }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enquiries -->
+    <div class="rounded-xl border border-card-border bg-white p-5">
+        <h2 class="text-[14px] font-semibold text-gray-800">Dernières consultations (bureau)</h2>
+        <div class="mt-4 space-y-3 text-[12px]">
+            {% for e in enquiries %}
+            <div class="flex items-center gap-3 rounded-lg border border-gray-100 px-3 py-2">
+                <i data-lucide="search" class="h-3.5 w-3.5 flex-shrink-0 text-gray-400"></i>
+                <div class="min-w-0">
+                    <div class="truncate font-medium text-gray-700">{{ e.institution_name }}</div>
+                    <div class="text-[11px] text-gray-400">{{ e.purpose }} — {{ e.enquiry_date.strftime('%d/%m/%Y') }}</div>
+                </div>
+            </div>
+            {% else %}
+            <div class="py-4 text-center text-gray-400">Aucune consultation enregistrée.</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- 36 months payment history ribbon -->
+<div class="mt-4 rounded-xl border border-card-border bg-white p-5" x-data="{ tip: null }">
+    <div class="mb-3 flex items-center justify-between">
+        <h2 class="text-[14px] font-semibold text-gray-800">Historique de paiement (36 mois)</h2>
+        <div class="flex items-center gap-3 text-[11px] text-gray-500">
+            <span class="inline-flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style="background:#16A34A"></span> à jour</span>
+            <span class="inline-flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style="background:#FCD34D"></span> retard &lt; 30 j</span>
+            <span class="inline-flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style="background:#F87171"></span> retard 30–90 j</span>
+            <span class="inline-flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style="background:#7F1D1D"></span> impayé / 90+ j</span>
+        </div>
+    </div>
+    <div class="flex flex-wrap gap-[3px]">
+        {% for h in history %}
+        {% if h.missed and h.max_dpd >= 90 %}{% set color = '#7F1D1D' %}
+        {% elif h.missed %}{% set color = '#F87171' %}
+        {% elif h.max_dpd >= 30 %}{% set color = '#F87171' %}
+        {% elif h.max_dpd > 0 %}{% set color = '#FCD34D' %}
+        {% else %}{% set color = '#16A34A' %}{% endif %}
+        <div class="h-9 min-w-[26px] flex-1 cursor-pointer rounded-md transition hover:scale-110"
+             style="background: {{ color }}"
+             @mouseenter="tip = { m: '{{ h.m }}', due: '{{ '%0.1f'|format(h.due / 1e6) }} M', paid: '{{ '%0.1f'|format(h.paid / 1e6) }} M', dpd: {{ h.max_dpd }}, missed: {{ h.missed }} }"
+             @mouseleave="tip = null"
+             title="{{ h.m }} — échu {{ '%0.2f'|format(h.due / 1e6) }} M XAF, payé {{ '%0.2f'|format(h.paid / 1e6) }} M XAF, DPD max {{ h.max_dpd }} j{% if h.missed %}, {{ h.missed }} échéance(s) impayée(s){% endif %}">
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Facilities table -->
+<div class="mt-4 overflow-hidden rounded-xl border border-card-border bg-white">
+    <div class="border-b border-card-border bg-canvas px-5 py-3 text-[13px] font-semibold text-gray-700">
+        Facilités de crédit ({{ loans|length }})
+    </div>
+    <table class="w-full min-w-[760px] text-left text-[13px]">
+        <thead>
+            <tr class="border-b border-card-border bg-canvas text-[11px] uppercase tracking-wide text-gray-500">
+                <th class="px-5 py-3 font-semibold">Prêt</th>
+                <th class="px-3 py-3 font-semibold">Institution</th>
+                <th class="px-3 py-3 font-semibold">Type</th>
+                <th class="px-3 py-3 text-right font-semibold">Capital initial</th>
+                <th class="px-3 py-3 text-right font-semibold">Encours</th>
+                <th class="px-3 py-3 font-semibold">Échéance</th>
+                <th class="px-3 py-3 text-center font-semibold">Statut</th>
+                <th class="px-5 py-3 text-center font-semibold">DPD</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for l in loans %}
+        <tr class="border-b border-gray-100 last:border-0 hover:bg-canvas/60">
+            <td class="px-5 py-3 font-mono text-[12px] text-gray-600">{{ l.loan_id }}</td>
+            <td class="px-3 py-3 text-gray-700">{{ l.institution_name }}</td>
+            <td class="px-3 py-3 text-gray-600">{{ l.loan_type }}</td>
+            <td class="px-3 py-3 text-right text-gray-800">{{ l.principal_amount|xaf }}</td>
+            <td class="px-3 py-3 text-right font-semibold text-gray-900">{{ l.outstanding_amount|xaf }}</td>
+            <td class="px-3 py-3 text-gray-600">{{ l.maturity_date.strftime('%d/%m/%Y') if l.maturity_date else 'n/d' }}</td>
+            <td class="px-3 py-3 text-center">
+                {% set st = {'ACTIVE': ('Encours','bg-badge-blue-bg','text-badge-blue-fg'),
+                             'CLOSED': ('Soldé','bg-badge-green-bg','text-badge-green-fg'),
+                             'DEFAULTED': ('Défaut','bg-badge-red-bg','text-badge-red-fg'),
+                             'WRITTEN_OFF': ('Annulé','bg-badge-red-bg','text-badge-red-fg')}[l.status] %}
+                <span class="inline-block rounded-full px-2.5 py-0.5 text-[11px] font-medium {{ st[1] }} {{ st[2] }}">{{ st[0] }}</span>
+            </td>
+            <td class="px-5 py-3 text-center text-[12px] text-gray-600">{{ l.current_dpd or 0 }} j</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

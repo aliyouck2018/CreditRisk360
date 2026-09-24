@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Clients — {{ app_name }}{% endblock %}
+{% block breadcrumb %}
+<a href="{{ url_for('main.dashboard') }}" class="text-gray-400 hover:text-gray-600">CreditRisk360</a>
+<i data-lucide="chevron-right" class="h-3 w-3 text-gray-300"></i>
+<span class="truncate font-medium text-gray-700">Clients</span>
+{% endblock %}
+
+{% block content %}
+<div class="mb-5 flex flex-wrap items-start justify-between gap-4">
+    <div>
+        <h1 class="text-[22px] font-bold text-gray-900">Emprunteurs</h1>
+        <p class="text-[13px] text-gray-500">{{ total|num }} emprunteurs actifs — filtrez et explorez les fiches 360°.</p>
+    </div>
+    <!-- demo profile shortcuts -->
+    <div class="flex flex-wrap gap-2">
+        {% for d in demo %}
+        {% set meta = demo_meta.get(d.borrower_id) %}
+        <a href="{{ url_for('borrowers.borrower_detail', borrower_id=d.borrower_id) }}"
+           class="inline-flex items-center gap-1.5 rounded-lg border border-card-border bg-white px-3 py-1.5 text-[12px] font-medium text-gray-600 hover:border-primary hover:text-primary transition">
+            <i data-lucide="user" class="h-3.5 w-3.5"></i> {{ d.display_name }}
+            {% if meta %}<span class="rounded-full px-1.5 py-0.5 text-[10px] font-semibold {{ meta[2] }} {{ meta[1] }}">{{ meta[0] }}</span>{% endif %}
+        </a>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="rounded-xl border border-card-border bg-white p-4" x-data>
+    <form method="get" class="flex flex-wrap items-end gap-3">
+        <div>
+            <label class="mb-1 block text-[11px] font-medium text-gray-500">Recherche</label>
+            <input type="text" name="q" value="{{ q }}" placeholder="Nom de l'emprunteur…"
+                   class="w-52 rounded-lg border border-card-border px-3 py-2 text-[13px] outline-none focus:border-primary">
+        </div>
+        <div>
+            <label class="mb-1 block text-[11px] font-medium text-gray-500">Pays</label>
+            <select name="country" class="w-36 rounded-lg border border-card-border px-3 py-2 text-[13px] outline-none focus:border-primary">
+                <option value="">Tous</option>
+                {% for c in countries %}
+                <option value="{{ c.country_code }}" {% if c.country_code == country %}selected{% endif %}>{{ c.name_short_fr }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="mb-1 block text-[11px] font-medium text-gray-500">Secteur</label>
+            <select name="sector" class="w-40 rounded-lg border border-card-border px-3 py-2 text-[13px] outline-none focus:border-primary">
+                <option value="">Tous</option>
+                {% for s in sectors %}
+                <option value="{{ s.sector }}" {% if s.sector == sector %}selected{% endif %}>{{ s.sector }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button class="rounded-lg bg-primary px-4 py-2 text-[13px] font-medium text-white hover:bg-primary-hover transition">Filtrer</button>
+        <a href="{{ url_for('borrowers.borrower_list') }}" class="rounded-lg border border-card-border px-4 py-2 text-[13px] text-gray-500 hover:text-gray-700">Réinitialiser</a>
+    </form>
+</div>
+
+<!-- Table -->
+<div class="mt-4 overflow-hidden rounded-xl border border-card-border bg-white" x-data>
+    <table class="w-full min-w-[820px] text-left text-[13px]">
+        <thead>
+            <tr class="border-b border-card-border bg-canvas text-[11px] uppercase tracking-wide text-gray-500">
+                <th class="px-5 py-3 font-semibold">Emprunteur</th>
+                <th class="px-3 py-3 font-semibold">Pays</th>
+                <th class="px-3 py-3 font-semibold">Secteur</th>
+                <th class="px-3 py-3 text-right font-semibold">Encours</th>
+                <th class="px-3 py-3 text-center font-semibold">DPD max</th>
+                <th class="px-3 py-3 text-center font-semibold">Score</th>
+                <th class="px-3 py-3 text-center font-semibold">Bande de risque</th>
+                <th class="px-5 py-3 text-right font-semibold">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for it in items %}
+            {% set band_colors = {'Faible': ('bg-badge-green-bg','text-badge-green-fg'),
+                                  'Modéré': ('bg-badge-blue-bg','text-badge-blue-fg'),
+                                  'Élevé': ('bg-badge-amber-bg','text-badge-amber-fg'),
+                                  'Très Élevé': ('bg-badge-red-bg','text-badge-red-fg')} %}
+            {% set bc = band_colors.get(it.risk_band, ('bg-gray-100','text-gray-500')) %}
+            <tr class="border-b border-gray-100 last:border-0 hover:bg-canvas/60 transition">
+                <td class="px-5 py-3">
+                    <div class="font-semibold text-gray-800">{{ it.display_name }}</div>
+                    <div class="text-[11px] text-gray-400">{{ it.borrower_id }} · {{ {'INDIVIDUAL':'Particulier','SME':'PME','CORPORATE':'Entreprise'}[it.borrower_type] }}</div>
+                </td>
+                <td class="px-3 py-3 text-gray-600">{{ it.country_name or '—' }}</td>
+                <td class="px-3 py-3 text-gray-600">{{ it.sector }}</td>
+                <td class="px-3 py-3 text-right font-medium text-gray-800">{{ it.total_outstanding|xaf }}</td>
+                <td class="px-3 py-3 text-center">
+                    {% if it.max_dpd and it.max_dpd >= 90 %}<span class="rounded-full px-2 py-0.5 text-[11px] font-medium bg-badge-red-bg text-badge-red-fg">{{ it.max_dpd }} j</span>
+                    {% elif it.max_dpd and it.max_dpd > 0 %}<span class="rounded-full px-2 py-0.5 text-[11px] font-medium bg-badge-amber-bg text-badge-amber-fg">{{ it.max_dpd }} j</span>
+                    {% else %}<span class="text-[11px] text-gray-400">0</span>{% endif %}
+                </td>
+                <td class="px-3 py-3 text-center font-bold {{ bc[1] }}">{{ it.score }}</td>
+                <td class="px-3 py-3 text-center"><span class="inline-block rounded-full px-2.5 py-0.5 text-[11px] font-medium {{ bc[0] }} {{ bc[1] }}">{{ it.risk_band }}</span></td>
+                <td class="px-5 py-3 text-right">
+                    <a href="{{ url_for('borrowers.borrower_detail', borrower_id=it.borrower_id) }}"
+                       class="inline-flex items-center gap-1 rounded-lg border border-card-border px-3 py-1.5 text-[12px] font-medium text-gray-600 hover:border-primary hover:text-primary transition">
+                        Fiche 360° <i data-lucide="arrow-right" class="h-3 w-3"></i>
+                    </a>
+                </td>
+            </tr>
+        {% else %}
+            <tr><td colspan="8" class="px-5 py-10 text-center text-gray-400">Aucun emprunteur ne correspond aux filtres.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <!-- pagination -->
+    <div class="flex items-center justify-between border-t border-card-border bg-canvas px-5 py-3 text-[12px] text-gray-500">
+        <span>Page {{ page }} — {{ ((page-1)*page_size + 1)|num }}–{{ (page*page_size if has_next else total)|num }} sur {{ total|num }}</span>
+        <div class="flex items-center gap-2">
+            {% if has_prev %}
+            <a href="{{ url_for('borrowers.borrower_list', q=q, country=country, sector=sector, page=page-1) }}"
+               class="rounded-lg border border-card-border bg-white px-3 py-1.5 font-medium text-gray-600 hover:text-primary">← Précédent</a>
+            {% endif %}
+            {% if has_next %}
+            <a href="{{ url_for('borrowers.borrower_list', q=q, country=country, sector=sector, page=page+1) }}"
+               class="rounded-lg border border-card-border bg-white px-3 py-1.5 font-medium text-gray-600 hover:text-primary">Suivant →</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

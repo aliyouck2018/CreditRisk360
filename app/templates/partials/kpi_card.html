@@ -1,0 +1,11 @@
+{# Reusable KPI card - calls with icon, bg/fg class names, label, value, subtitle #}
+<div class="flex items-center gap-4 rounded-xl border border-card-border bg-white px-5 py-4">
+    <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg {{ icon_bg }}">
+        <i data-lucide="{{ icon }}" class="h-5 w-5 {{ icon_fg }}"></i>
+    </div>
+    <div class="min-w-0">
+        <div class="truncate text-[12px] font-medium text-gray-500">{{ label }}</div>
+        <div class="whitespace-nowrap text-[22px] font-bold text-gray-900 leading-tight">{{ value }}</div>
+        {% if subtitle %}<div class="text-[11px] text-gray-400">{{ subtitle }}</div>{% endif %}
+    </div>
+</div>

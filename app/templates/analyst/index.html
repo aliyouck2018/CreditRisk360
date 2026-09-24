@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Analyste IA — {{ app_name }}{% endblock %}
+{% block breadcrumb_current %}Analyste IA{% endblock %}
+
+{% block content %}
+<div class="mb-5">
+    <h1 class="text-[22px] font-bold text-gray-900">Analyste IA en langage naturel</h1>
+    <p class="text-[13px] text-gray-500">
+        Conversion texte → SQL strictement en lecture seule sur les vues <code>v_*</code> ·
+        <code>LIMIT 500</code> imposé · catalogues système interdits.
+    </p>
+</div>
+
+<div class="grid gap-4 xl:grid-cols-3" x-data="analystChat()">
+    <!-- Chat -->
+    <div class="rounded-xl border border-card-border bg-white p-5 xl:col-span-2">
+        <div class="space-y-3 min-h-[300px]" x-ref="container">
+            <template x-for="(msg, i) in history" :key="i">
+                <div :class="msg.role === 'user' ? 'text-right' : ''">
+                    <div class="inline-block max-w-[85%] rounded-xl px-4 py-3 text-[13px] text-left"
+                         :class="msg.role === 'user' ? 'bg-primary text-white' : 'bg-canvas border border-card-border text-gray-800'">
+                        <template x-if="msg.role !== 'user'">
+                            <div>
+                                <template x-if="msg.error">
+                                    <p class="text-badge-red-fg" x-text="msg.error"></p>
+                                </template>
+                                <template x-if="!msg.error">
+                                    <div>
+                                        <p x-text="msg.explanation"></p>
+                                        <details class="mt-2" x-data>
+                                            <summary class="cursor-pointer text-[11px] font-medium text-kpi-purple-fg hover:underline">Requête générée</summary>
+                                            <pre class="mt-2 overflow-x-auto rounded-lg bg-[#111827] p-3 text-[11px] text-gray-100" x-text="msg.sql"></pre>
+                                        </details>
+                                        <template x-if="msg.rows && msg.rows.length">
+                                            <div class="mt-3 max-h-64 overflow-auto rounded-lg border border-card-border">
+                                                <table class="w-full text-[11.5px] whitespace-nowrap">
+                                                    <thead class="sticky top-0 bg-canvas text-left text-[10px] uppercase text-gray-500">
+                                                        <tr><template x-for="c in msg.columns"><th class="px-3 py-1.5 font-semibold" x-text="c"></th></template></tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <template x-for="(row, r) in msg.rows.slice(0, 50)">
+                                                            <tr class="border-t border-gray-100">
+                                                                <template x-for="cell in row">
+                                                                    <td class="px-3 py-1.5 text-gray-700" x-text="cell"></td>
+                                                                </template>
+                                                            </tr>
+                                                        </template>
+                                                    </tbody>
+                                                </table>
+                                                <div class="border-t border-gray-100 bg-canvas px-3 py-1 text-[10px] text-gray-400"
+                                                     x-show="msg.rows.length > 50"
+                                                     x-text="'50 premières lignes affichées sur ' + msg.rows.length">
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                        <template x-if="msg.role === 'user'"><span x-text="msg.text"></span></template>
+                    </div>
+                    <div class="px-1 pt-1 text-[10px] text-gray-400" x-text="msg.role === 'user' ? 'Vous' : 'Analyste IA'"></div>
+                </div>
+            </template>
+        </div>
+
+        <form @submit.prevent="send()" class="mt-4 flex gap-2">
+            <input x-model="input" type="text" placeholder="Ex : encours par pays, NPL par secteur, top 10 emprunteurs…"
+                   class="flex-1 rounded-lg border border-card-border px-4 py-2.5 text-[13px] focus:border-primary outline-none">
+            <button type="submit" class="rounded-lg bg-primary px-5 py-2.5 text-[13px] font-semibold text-white hover:bg-primary-hover transition">
+                Analyser
+            </button>
+        </form>
+    </div>
+
+    <!-- Examples -->
+    <div class="rounded-xl border border-card-border bg-white p-5">
+        <h2 class="text-[14px] font-semibold text-gray-800">Exemples de questions</h2>
+        <ul class="mt-3 space-y-2 text-[12.5px]">
+            {% for ex in [
+                'Encours par pays',
+                'NPL par secteur',
+                'Encours par secteur',
+                'Top 10 des emprunteurs',
+                'Encours par institution',
+                'NPL par pays',
+            ] %}
+            <li>
+                <button class="w-full rounded-lg border border-card-border bg-canvas px-3 py-2 text-left text-gray-700 hover:border-primary hover:text-primary transition"
+                        @click="input = '{{ ex }}'; send()">
+                    "{{ ex }}"
+                </button>
+            </li>
+            {% endfor %}
+        </ul>
+        <div class="mt-4 rounded-lg bg-kpi-blue-bg px-3 py-2 text-[11px] text-kpi-blue-fg leading-relaxed">
+            <i data-lucide="shield" class="mr-1 inline h-3 w-3"></i>
+            Garde-fous : SELECT uniquement · vues <code>v_*</code> uniquement · pas de catalogues système · LIMIT 500 automatique · explication en ≤ 120 mots.
+        </div>
+        <div class="mt-2">
+            <details class="rounded-lg border border-card-border p-3 text-[12px] text-gray-600">
+                <summary class="cursor-pointer font-medium text-gray-700">Mode expert — saisir directement du SQL</summary>
+                <p class="mt-2 text-[11px] text-gray-400">Les mêmes garde-fous de validation NSQL s'appliquent (vues v_* uniquement et SELECT uniquement).</p>
+                <div class="mt-2 flex gap-2">
+                    <input x-model="input" placeholder="SELECT * FROM v_kpi_monthly …"
+                           class="w-full rounded-lg border border-card-border px-3 py-2 text-[12px] focus:border-primary outline-none">
+                    <button type="button" class="rounded-lg border border-card-border px-3 font-medium text-gray-600 hover:text-primary"
+                            @click="send()">Exécuter</button>
+                </div>
+            </details>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function analystChat() {
+    return {
+        history: [],
+        input: '',
+        async send() {
+            const q = this.input.trim();
+            if (!q) return;
+            this.history.push({ role: 'user', text: q });
+            this.input = '';
+            this.scroll();
+            try {
+                const res = await fetch('{{ url_for("analyst.query") }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: q })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    this.history.push({ role: 'ai', explanation: data.explanation, sql: data.sql, rows: data.rows });
+                } else {
+                    this.history.push({ role: 'ai', error: data.error || 'Erreur inconnue.' });
+                }
+            } catch (e) {
+                this.history.push({ role: 'ai', error: 'Échec réseau.' });
+            }
+            this.$nextTick(() => this.$refs.container.scrollTop = this.$refs.container.scrollHeight);
+        },
+    };
+}
+</script>
+{% endblock %}

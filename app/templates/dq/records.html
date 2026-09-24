@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}{{ rule.rule_id }} — Qualité des données{% endblock %}
+{% block breadcrumb_current %}
+<a href="{{ url_for('dq.index') }}" class="text-gray-400 hover:text-gray-600">Qualité des données</a>
+<i data-lucide="chevron-right" class="h-3 w-3 text-gray-300"></i>
+<span class="truncate font-medium text-gray-700">{{ rule.rule_id }} — {{ rule.label_fr }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="rounded-xl border border-card-border bg-white p-5">
+    <div class="mb-3 flex items-center gap-3">
+        <span class="font-mono text-[12px] font-semibold text-kpi-purple-fg bg-kpi-purple-bg rounded px-2 py-1">{{ rule.rule_id }}</span>
+        <h1 class="text-[17px] font-bold text-gray-900">{{ rule.label_fr }}</h1>
+        <span class="ml-auto text-[12px] text-gray-500">Dimension : <b>{{ rule.dimension }}</b></span>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full min-w-[820px] text-left text-[13px]">
+            <thead>
+                <tr class="border-b border-card-border bg-canvas text-[11px] uppercase text-gray-500">
+                    {% for col in columns %}
+                    <th class="px-3 py-2 font-semibold">{{ col }}</th>
+                    {% endfor %}
+                    <th class="px-3 py-2 text-center font-semibold">Statut workflow</th>
+                    <th class="px-3 py-2 text-right font-semibold">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in rows %}
+            <tr id="row-{{ row.record_id }}" class="border-b border-gray-100 last:border-0 hover:bg-canvas/50">
+                {% for col, val in row.fields.items() %}
+                {% if loop.first %}
+                <td class="px-3 py-2 font-mono text-[12px] font-semibold text-gray-800">{{ row.record_id }}</td>
+                {% else %}
+                <td class="px-3 py-2 text-gray-600">{{ val if val is not none else 'n/d' }}</td>
+                {% endif %}
+                {% endfor %}
+                <td class="px-3 py-2 text-center">
+                    <span class="inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold wf-status"
+                          data-id="{{ row.record_id }}"
+                          style="{% if row.status == 'RESOLVED' %}background:#DCFCE7;color:#16A34A{% elif row.status == 'INVESTIGATING' %}background:#FEF3C7;color:#D97706{% else %}background:#FEE2E2;color:#DC2626{% endif %}">
+                        {{ {'RESOLVED': 'Corrigé', 'INVESTIGATING': 'En investigation', 'DETECTED': 'Détecté'}[row.status] }}
+                    </span>
+                </td>
+                <td class="px-3 py-2 text-right whitespace-nowrap">
+                    <button onclick="setStatus('{{ row.record_id }}', 'INVESTIGATING')"
+                            class="mr-1 rounded-lg border border-card-border px-2 py-1 text-[11px] font-medium text-gray-600 hover:border-amber-400 hover:text-amber-600">
+                        🔍 Investiguer
+                    </button>
+                    {% if rule.rule_id in fixable %}
+                    <button onclick="fixRecord('{{ row.record_id }}')"
+                            class="rounded-lg border border-card-border px-2 py-1 text-[11px] font-medium text-gray-600 hover:border-green-400 hover:text-green-600">
+                        ✅ Corriger
+                    </button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="{{ columns|length + 2 }}" class="px-3 py-8 text-center text-gray-400">Aucune anomalie — règle conforme.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <a href="{{ url_for('dq.index') }}" class="mt-4 inline-flex items-center gap-1 text-[12px] text-gray-500 hover:text-primary">
+        ← Retour au tableau des règles
+    </a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const RULE_ID = "{{ rule.rule_id }}";
+const FIXABLE = {{ fixable|tojson }};
+
+async function updateStatus(recordId, status) {
+    const fd = new FormData();
+    fd.append('record_id', recordId);
+    fd.append('status', status);
+    await fetch(`{{ url_for('dq.rule_status', rule_id=rule.rule_id) }}`, { method: 'POST', body: fd });
+    renderStatus(recordId, status);
+}
+
+function renderStatus(recordId, status) {
+    const badge = document.querySelector(`.wf-status[data-id="${recordId}"]`);
+    if (!badge) return;
+    const styles = {
+        RESOLVED: ['#DCFCE7', '#16A34A', 'Corrigé'],
+        INVESTIGATING: ['#FEF3C7', '#D97706', 'En investigation'],
+        DETECTED: ['#FEE2E2', '#DC2626', 'Détecté'],
+    };
+    const [bg, fg, label] = styles[status];
+    badge.style.background = bg;
+    badge.style.color = fg;
+    badge.textContent = label;
+}
+
+async function fixRecord(recordId) {
+    const fd = new FormData();
+    fd.append('record_id', recordId);
+    await fetch(`{{ url_for('dq.rule_fix', rule_id=rule.rule_id) }}`, { method: 'POST', body: fd });
+    renderStatus(recordId, 'RESOLVED');
+}
+</script>
+{% endblock %}

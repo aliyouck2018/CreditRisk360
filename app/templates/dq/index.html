@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Qualité des données — {{ app_name }}{% endblock %}
+{% block breadcrumb_current %}Qualité des données{% endblock %}
+
+{% block content %}
+<div class="mb-5 flex flex-wrap items-start justify-between gap-4">
+    <div>
+        <h1 class="text-[22px] font-bold text-gray-900">Qualité des données</h1>
+        <p class="text-[13px] text-gray-500">10 règles automatisées · 4 dimensions · workflow de résolution.</p>
+    </div>
+    <button id="btn-revalidate"
+            class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-primary-hover transition">
+        <i data-lucide="refresh-ccw" class="h-4 w-4"></i> Relancer la validation
+    </button>
+</div>
+
+<!-- DQ scores -->
+<div class="grid grid-cols-2 gap-4 md:grid-cols-5">
+    <div class="flex items-center gap-4 rounded-xl border border-card-border bg-white px-5 py-4">
+        <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-kpi-purple-bg">
+            <i data-lucide="shield-check" class="h-5 w-5 text-kpi-purple-fg"></i>
+        </div>
+        <div>
+            <div class="text-[11px] font-medium text-gray-500">Score DQ global</div>
+            <div class="text-[22px] font-bold text-gray-900" id="dq-global">{{ gscore }} <span class="text-[13px] text-gray-400">/100</span></div>
+        </div>
+    </div>
+    {% for key, val in dims.items() %}
+    <div class="flex items-center gap-4 rounded-xl border border-card-border bg-white px-5 py-4">
+        <div class="flex h-11 w-11 items-center justify-center rounded-lg
+             {% if val >= 90 %}bg-kpi-green-bg{% elif val >= 70 %}bg-kpi-amber-bg{% else %}bg-kpi-red-bg{% endif %}">
+            <i data-lucide="{{ {'Complétude':'layers','Validité':'clipboard-check','Unicité':'file-x','Cohérence':'git-compare'}[key] }}"
+               class="h-5 w-5 {% if val >= 90 %}text-kpi-green-fg{% elif val >= 70 %}text-kpi-amber-fg{% else %}text-kpi-red-fg{% endif %}"></i>
+        </div>
+        <div>
+            <div class="text-[11px] font-medium text-gray-500">{{ key }}</div>
+            <div class="text-[18px] font-bold text-gray-900 dimension-val" data-dim="{{ key }}">{{ val }}</div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Rules table -->
+<div class="mt-6 overflow-hidden rounded-xl border border-card-border bg-white">
+    <table class="w-full min-w-[880px] text-left text-[13px]">
+        <thead>
+            <tr class="border-b border-card-border bg-canvas text-[11px] uppercase tracking-wide text-gray-500">
+                <th class="px-5 py-3 font-semibold">Règle</th>
+                <th class="px-3 py-3 font-semibold">Dimension</th>
+                <th class="px-3 py-3 text-center font-semibold">Anomalies détectées</th>
+                <th class="px-3 py-3 text-center font-semibold">Score règle</th>
+                <th class="px-5 py-3 text-right font-semibold">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for r in rules %}
+            {% set rowid = r.id %}
+            {% set col = 'bg-badge-green-bg text-badge-green-fg' if r.count == 0 else ('bg-badge-red-bg text-badge-red-fg' if r.count > 20 else 'bg-badge-amber-bg text-badge-amber-fg') %}
+            <tr id="rule-{{ r.id }}" class="border-b border-gray-100 last:border-0 hover:bg-canvas/60">
+                <td class="px-5 py-3">
+                    <a href="{{ url_for('dq.rule_detail', rule_id=r.id) }}" class="flex items-center gap-3">
+                        <span class="font-mono text-[11px] font-semibold text-kpi-purple-fg bg-kpi-purple-bg rounded px-1.5 py-0.5">{{ r.id }}</span>
+                        <span class="font-medium text-gray-700">{{ r.label_fr }}</span>
+                    </a>
+                </td>
+                <td class="px-3 py-3 text-gray-600">{{ r.dimension }}</td>
+                <td class="px-3 py-3 text-center">
+                    <span class="inline-block rounded-full px-2.5 py-0.5 text-[12px] font-semibold {{ col }} dq-count" data-rule="{{ r.id }}">{{ r.count }}</span>
+                </td>
+                <td class="px-3 py-3 text-center font-semibold {{ 'text-badge-green-fg' if r.score >= 90 }}"
+                    >
+                    <span class="dq-score" data-rule="{{ r.id }}">{{ r.score }}</span>
+                </td>
+                <td class="px-5 py-3 text-right">
+                    <a href="{{ url_for('dq.rule_detail', rule_id=r.id) }}"
+                       class="inline-flex items-center gap-1 rounded-lg border border-card-border px-3 py-1.5 font-medium text-gray-600 hover:border-primary hover:text-primary transition">
+                        Détails <i data-lucide="chevron-right" class="h-3 w-3"></i>
+                    </a>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/htmx.org@2/dist/htmx.min.js"></script>
+<script>
+document.getElementById('btn-revalidate').addEventListener('click', async function () {
+    const btn = this;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="h-4 w-4 animate-spin" data-lucide="loader"></i> Recalcul…';
+    try {
+        const res = await fetch('{{ url_for("dq.revalidate") }}', { method: 'POST' });
+        const data = await res.json();
+        if (!data.ok) throw new Error();
+        document.getElementById('dq-global').innerHTML =
+            `${data.global_score} <span class="text-[13px] text-gray-400">/100</span>`;
+        document.querySelectorAll('.dimension-val').forEach(el => {
+            el.textContent = data.dimensions[el.dataset.dim];
+        });
+        document.querySelectorAll('.dq-count').forEach(el => {
+            el.textContent = (data.counts[el.dataset.rule] || {}).count ?? '—';
+        });
+        document.querySelectorAll('.dq-score').forEach(el => {
+            el.textContent = (data.counts[el.dataset.rule] || {}).score ?? '—';
+        });
+    } catch (e) {
+        alert('Échec de la revalidation.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg…>';
+        if (window.lucide) lucide.createIcons();
+    }
+});
+</script>
+{% endblock %}

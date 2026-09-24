@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Alertes (SAP) — {{ app_name }}{% endblock %}
+{% block breadcrumb_current %}Alertes (SAP){% endblock %}
+
+{% block content %}
+<div class="mb-5">
+    <h1 class="text-[22px] font-bold text-gray-900">Système d'Alerte Précoce (SAP)</h1>
+    <p class="text-[13px] text-gray-500">Détection automatique des dérives par segment (Pays × Secteur × Taille d'entreprise) — facteurs de dégradation attribués.</p>
+</div>
+
+{% set level_style = {'HIGH': ('bg-badge-red-bg','text-badge-red-fg','Élevé'),
+                      'MEDIUM': ('bg-badge-amber-bg','text-badge-amber-fg','Modéré')} %}
+
+<div class="space-y-4" x-data="{ open: null }">
+{% for a in alerts %}
+    <div class="rounded-xl border {{ 'border-red-200' if a.level == 'HIGH' else 'border-amber-200' }} bg-white overflow-hidden">
+        <button class="flex w-full items-center gap-4 px-5 py-4 text-left"
+                @click="open = open === '{{ loop.index }}' ? null : '{{ loop.index }}'">
+            <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg {{ level_style[a.level][0] }}">
+                <i data-lucide="alert-triangle" class="h-5 w-5 {{ level_style[a.level][1] }}"></i>
+            </div>
+            <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-[14px] font-bold text-gray-900">{{ a.country }} · {{ a.sector }}</span>
+                    <span class="rounded-full px-2 py-0.5 text-[10px] font-medium bg-badge-blue-bg text-badge-blue-fg">{{ {'INDIVIDUAL':'Particuliers','SME':'PME','CORPORATE':'Entreprises'}[a.borrower_type] }}</span>
+                    <span class="rounded-full px-2.5 py-0.5 text-[10px] font-bold {{ level_style[a.level][0] }} {{ level_style[a.level][1] }}">{{ level_style[a.level][2] }}</span>
+                </div>
+                <div class="mt-0.5 text-[12px] text-gray-500">
+                    NPL {{ a.npl_ratio }} % (vs {{ a.npl_ratio_before }} % il y a 6 mois) — dérive <b class="{{ 'text-badge-red-fg' if a.drift > 0 else 'text-badge-green-fg' }}">{{ '+%.1f'|format(a.drift) if a.drift > 0 else '%.1f'|format(a.drift) }} pts</b>
+                    · Encours {{ a.exposure|xaf }} · Défauts {{ a.npl|xaf }}
+                </div>
+            </div>
+            <i data-lucide="chevron-down" class="ml-auto h-4 w-4 text-gray-400"></i>
+        </button>
+        <div x-show="open === '{{ loop.index }}'" x-collapse class="border-t border-red-50 bg-canvas px-5 py-4" x-cloak style="display:none">
+            <div class="mb-2 flex items-center gap-2 text-[12px] font-semibold text-gray-700">
+                <i data-lucide="help-circle" class="h-4 w-4 text-primary"></i> Pourquoi ?
+            </div>
+            {% set total_pct = a.drivers|sum(attribute='pct') if a.drivers else 0 %}
+            {% for d in a.drivers %}
+            <div class="mb-2">
+                <div class="mb-1 flex items-center justify-between text-[12px]">
+                    <span class="text-gray-700">{{ d.label }}</span>
+                    <span class="font-semibold" style="color: {{ d.color }}">{{ d.pct }} %</span>
+                </div>
+                <div class="h-2 w-full rounded-full bg-canvas overflow-hidden">
+                    <div class="h-2 rounded-full" style="width: {{ d.pct }}%; background: {{ d.color }}"></div>
+                </div>
+                <div class="mt-0.5 text-[11px] text-gray-400">{{ d.amount|xaf }} d'encours dégradé (>= 90 j)</div>
+            </div>
+            {% else %}
+            <div class="text-[12px] text-gray-400">Attribution indisponible pour ce segment.</div>
+            {% endfor %}
+        </div>
+    </div>
+{% else %}
+<div class="rounded-xl border border-card-border bg-white px-5 py-10 text-center text-gray-400">
+    <i data-lucide="party-popper" class="mx-auto h-8 w-8"></i>
+    Aucune dérive significative détectée — portefeuille sous contrôle.
+</div>
+{% endfor %}
+</div>
+{% endblock %}

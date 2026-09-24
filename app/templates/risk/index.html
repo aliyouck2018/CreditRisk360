@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Risk Analytics — {{ app_name }}{% endblock %}
+{% block breadcrumb_current %}Risk Analytics{% endblock %}
+
+{% block content %}
+<div class="mb-5">
+    <h1 class="text-[22px] font-bold text-gray-900">Risk Analytics</h1>
+    <p class="text-[13px] text-gray-500">Retards, analyse de cohorte et concentration — données au {{ AS_OF_DATE.strftime('%d/%m/%Y') }}.</p>
+</div>
+
+<!-- DPD buckets -->
+<div class="rounded-xl border border-card-border bg-white p-5">
+    <h2 class="mb-4 text-[14px] font-semibold text-gray-800">Tranches de retards (DPD) — encours actifs</h2>
+    <div class="grid grid-cols-2 gap-3 md:grid-cols-5">
+        {% for d in dpd %}
+        <div class="rounded-lg border border-gray-100 p-3">
+            <div class="text-[11px] font-medium text-gray-500">{{ d.label }}</div>
+            <div class="text-[18px] font-bold text-gray-900">{{ d.exposure|xaf }}</div>
+            <div class="text-[11px] text-gray-400">{{ d.n|num }} prêts · {{ '%.1f %%'|format(d.exposure / total_exposure * 100) }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    <div id="chart-dpd" class="mt-2 h-56"></div>
+</div>
+
+<!-- Vintage curves + heatmap -->
+<div class="mt-4 grid gap-4 xl:grid-cols-2">
+    <div class="rounded-xl border border-card-border bg-white p-5">
+        <h2 class="mb-3 text-[14px] font-semibold text-gray-800">Analyse vintage — taux de défaut cumulé par MOB</h2>
+        <div id="chart-vintage" class="h-80"></div>
+    </div>
+    <div class="rounded-xl border border-card-border bg-white p-5">
+        <h2 class="mb-3 text-[14px] font-semibold text-gray-800">Heatmap — défaut cumulé ( %) par cohorte &amp; MOB</h2>
+        <table class="w-full text-[10px]">
+            <thead>
+                <tr class="text-gray-400">
+                    <th class="py-1 text-left font-medium">Cohorte</th>
+                    {% for mob in range(0, 24) %}
+                    <th class="py-1 text-center font-medium">{{ mob }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+            {% for c in curves %}
+                <tr>
+                    <td class="py-0.5 pr-2 font-medium text-gray-600">{{ c.cohort }}</td>
+                    {% for v in c.vals %}
+                    <td class="py-0.5">
+                        {% if v > 0 %}
+                        {% set lvl = (v / 2)|round(0, 'floor')|int %}
+                        <div class="rounded-sm text-center font-medium py-1"
+                             style="background: rgba(220,38,38, {{ [0.08, 0.25, 0.45, 0.65, 0.85][lvl if lvl < 5 else 4] }}); color: {{ ('#fff' if v > 6 else '#7F1D1D') }}">
+                            {{ '%.1f'|format(v) }}</div>
+                        {% else %}
+                        <div class="rounded-sm py-1 text-center text-gray-300">·</div>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- HHI + limits -->
+<div class="mt-4 grid gap-4 xl:grid-cols-2">
+    <div class="rounded-xl border border-card-border bg-white p-5">
+        <h2 class="text-[14px] font-semibold text-gray-800">Concentration — indice HHI</h2>
+        <div class="mt-4 grid grid-cols-2 gap-4">
+            <div class="rounded-lg border border-gray-100 p-4 text-center">
+                <div class="text-[11px] text-gray-500">HHI par secteur</div>
+                <div class="mt-1 text-[26px] font-bold {{ 'text-badge-red-fg' if hhi_sector > 1800 else ('text-badge-amber-fg' if hhi_sector > 1500 else 'text-badge-green-fg') }}">{{ hhi_sector|num }}</div>
+                <div class="text-[10px] text-gray-400">{{ 'Forte concentration' if hhi_sector > 2500 else ('Concentration modérée' if hhi_sector > 1500 else 'Concentration faible') }}</div>
+            </div>
+            <div class="rounded-xl bg-white border border-gray-100 p-4 text-center">
+                <div class="text-[11px] text-gray-500">HHI par pays</div>
+                <div class="mt-1 text-[26px] font-bold {{ 'text-badge-red-fg' if hhi_country > 2500 else ('text-badge-amber-fg' if hhi_country > 1500 else 'text-badge-green-fg') }}">{{ hhi_country|num }}</div>
+                <div class="text-[10px] text-gray-400">{{ 'Forte concentration' if hhi_country > 2500 else ('Concentration modérée' if hhi_country > 1500 else 'Concentration faible') }}</div>
+            </div>
+        </div>
+        <div id="chart-hhi" class="mt-4 h-64"></div>
+    </div>
+
+    <div class="rounded-xl border border-card-border bg-white p-5">
+        <h2 class="mb-3 text-[14px] font-semibold text-gray-800">Suivi des limites réglementaires</h2>
+        <div class="mb-2 text-[11px] text-gray-500">Secteur unique ≤ {{ sector_limit_pct }} % de l'exposition du pays · Emprunteur unique ≤ {{ borrower_limit_pct }} % de l'encours total.</div>
+        <table class="w-full text-[12px]">
+            <thead>
+                <tr class="border-b border-card-border bg-canvas text-[10px] uppercase text-gray-500">
+                    <th class="px-3 py-2 font-semibold">Pays</th>
+                    <th class="px-2 py-2 font-semibold">Secteur</th>
+                    <th class="px-2 py-2 text-right font-semibold">Exposition</th>
+                    <th class="px-2 py-2 text-right font-semibold">Part ( %)</th>
+                    <th class="px-3 py-2 text-center font-semibold">Statut</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for r in sector_limits %}
+            <tr class="border-b border-gray-100 last:border-0">
+                <td class="px-3 py-1.5 text-gray-600">{{ r.country }}</td>
+                <td class="px-2 py-1.5 text-gray-700">{{ r.sector }}</td>
+                <td class="px-2 py-1.5 text-right text-gray-800">{{ r.exposure|xaf }}</td>
+                <td class="px-2 py-1.5 text-right font-semibold">{{ r.share }} %</td>
+                <td class="px-3 py-1.5 text-center">
+                    {% set col = {'OK': 'bg-badge-green-bg text-badge-green-fg', 'VIGILANCE': 'bg-badge-amber-bg text-badge-amber-fg', 'DÉPASSEMENT': 'bg-badge-red-bg text-badge-red-fg'}[r.status] %}
+                    <span class="inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold {{ col }}">{{ r.status }}</span>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        <h3 class="mt-4 mb-2 text-[12px] font-semibold text-gray-800">Emprunteurs uniques les plus exposés (limite {{ borrower_limit_pct }} %)</h3>
+        <table class="w-full text-[12px]">
+            <thead>
+                <tr class="border-b border-card-border bg-canvas text-[10px] uppercase text-gray-500">
+                    <th class="px-3 py-2 font-semibold">Emprunteur</th>
+                    <th class="px-2 py-2 font-semibold">Pays</th>
+                    <th class="px-2 py-2 text-right font-semibold">Exposition</th>
+                    <th class="px-2 py-2 text-right font-semibold">Part ( %)</th>
+                    <th class="px-3 py-2 text-center font-semibold">Statut</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for r in borrower_limits %}
+            <tr class="border-b border-gray-100 last:border-0">
+                <td class="px-3 py-1.5 text-gray-700">{{ r.display_name }}</td>
+                <td class="px-2 py-1.5 text-gray-600">{{ r.country }}</td>
+                <td class="px-2 py-1.5 text-right text-gray-800">{{ r.exposure|xaf }}</td>
+                <td class="px-2 py-1.5 text-right font-semibold">{{ r.share }} %</td>
+                <td class="px-3 py-1.5 text-center">
+                    {% set col = {'OK': 'bg-badge-green-bg text-badge-green-fg', 'VIGILANCE': 'bg-badge-amber-bg text-badge-amber-fg', 'DÉPASSEMENT': 'bg-badge-red-bg text-badge-red-fg'}[r.status] %}
+                    <span class="inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold {{ col }}">{{ r.status }}</span>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var grid = { borderColor: '#E2E8F0', strokeDashArray: 4 };
+    // DPD bars
+    new ApexCharts(document.querySelector('#chart-dpd'), {
+        chart: { type: 'bar', height: 224, stacked: true, toolbar: { show: false }, animations: { enabled: false } },
+        series: [{ name: 'Encours (Md XAF)', data: {{ dpd_values_json|safe }} }],
+        xaxis: { categories: {{ dpd_labels_json|safe }} },
+        colors: ['#16A34A', '#FCD34D', '#FB923C', '#F87171', '#7F1D1D'],
+        plotOptions: { bar: { distributed: true, borderRadius: 4, columnWidth: '45%' } },
+        grid: grid, dataLabels: { enabled: false }, legend: { show: false },
+        tooltip: { y: { formatter: function (v) { return v + ' Md XAF'; } } },
+    }).render();
+
+    // Vintage curves
+    new ApexCharts(document.querySelector('#chart-vintage'), {
+        chart: { type: 'line', height: 320, toolbar: { show: false }, animations: { enabled: false } },
+        series: {{ vintage_series_json|safe }},
+        xaxis: { categories: {{ vintage_x_json|safe }}, tickAmount: 12, title: { text: 'MOB (mois)' } },
+        yaxis: { tickAmount: 4, labels: { formatter: function (v) { return v + ' %'; } } },
+        stroke: { width: 2, curve: 'smooth' },
+        colors: ['#5B50E5', '#0284C7', '#16A34A', '#D97706', '#DC2626', '#9CA3AF'],
+        grid: grid, legend: { position: 'top', fontSize: '11px' },
+        tooltip: { y: { formatter: function (v) { return v.toFixed(2) + ' %'; } } },
+    }).render();
+
+    // HHI — top sector shares horizontal
+    new ApexCharts(document.querySelector('#chart-hhi'), {
+        chart: { type: 'bar', height: 256, toolbar: { show: false }, animations: { enabled: false } },
+        series: [{ name: "Part d'encours (%)", data: {{ hhi_series_json|safe }}.map(function (d) { return d.y; }) }],
+        xaxis: { categories: {{ hhi_series_json|safe }}.map(function (d) { return d.name; }) },
+        colors: ['#0284C7'],
+        plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: '55%' } },
+        grid: grid, dataLabels: { enabled: false },
+        xaxis: { labels: { formatter: function (v) { return v + ' %'; } } },
+    }).render();
+});
+</script>
+{% endblock %}

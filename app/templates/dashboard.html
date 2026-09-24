@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Tableau de bord — {{ app_name }}{% endblock %}
+{% block breadcrumb_current %}Tableau de bord{% endblock %}
+
+{% block content %}
+<div class="mb-5">
+    <h1 class="text-[22px] font-bold text-gray-900">Tableau de bord exécutif</h1>
+    <p class="text-[13px] text-gray-500">Vue synthétique du portefeuille de crédit CEMAC — données synthétiques au {{ AS_OF_DATE.strftime('%d/%m/%Y') }}.</p>
+</div>
+
+<!-- KPI grid -->
+<div class="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+    {% with icon='wallet', icon_bg='bg-kpi-purple-bg', icon_fg='text-kpi-purple-fg', label='Encours total', value=kpi.exposure|xaf, subtitle='Encours restant dû' %}{% include 'partials/kpi_card.html' %}{% endwith %}
+    {% with icon='users', icon_bg='bg-kpi-blue-bg', icon_fg='text-kpi-blue-fg', label='Emprunteurs', value=kpi.borrower_count|num, subtitle='Clients référencés' %}{% include 'partials/kpi_card.html' %}{% endwith %}
+    {% with icon='file-signature', icon_bg='bg-kpi-green-bg', icon_fg='text-kpi-green-fg', label='Prêts actifs', value=kpi.active_loan_count|num, subtitle=kpi.closed_loan_count|num ~ ' clôturés' %}{% include 'partials/kpi_card.html' %}{% endwith %}
+    {% with icon='alert-circle', icon_bg='bg-kpi-red-bg', icon_fg='text-kpi-red-fg', label='Ratio NPL', value='%.1f %%'|format(kpi.npl_ratio), subtitle='Encours en défaut +90 j' %}{% include 'partials/kpi_card.html' %}{% endwith %}
+    {% with icon='trending-down', icon_bg='bg-kpi-amber-bg', icon_fg='text-kpi-amber-fg', label='Défaut 12 mois', value='%.1f %%'|format(kpi.default_rate_12m), subtitle='Franchissement 90 j' %}{% include 'partials/kpi_card.html' %}{% endwith %}
+    {% with icon='timer', icon_bg='bg-kpi-blue-bg', icon_fg='text-kpi-blue-fg', label='Taux de paiement', value='%.1f %%'|format(kpi.payment_rate), subtitle='Payé / échu à date' %}{% include 'partials/kpi_card.html' %}{% endwith %}
+</div>
+
+<!-- Charts -->
+<div class="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-3">
+    <div class="rounded-xl border border-card-border bg-white p-5 xl:col-span-2">
+        <div class="mb-3 flex items-center justify-between">
+            <h2 class="text-[14px] font-semibold text-gray-800">Évolution encours &amp; NPL</h2>
+            <span class="text-[11px] text-gray-400">{{ trend.labels|first }} → {{ trend.labels|last }} (Md XAF)</span>
+        </div>
+        <div id="chart-trend" class="h-72"></div>
+    </div>
+    <div class="rounded-xl border border-card-border bg-white p-5">
+        <h2 class="mb-3 text-[14px] font-semibold text-gray-800">Bandes de risque (échantillon)</h2>
+        <div id="chart-bands" class="h-72"></div>
+    </div>
+    <div class="rounded-xl border border-card-border bg-white p-5">
+        <h2 class="mb-3 text-[14px] font-semibold text-gray-800">Exposition par pays</h2>
+        <div id="chart-countries" class="h-80"></div>
+    </div>
+    <div class="rounded-xl border border-card-border bg-white p-5 xl:col-span-2">
+        <h2 class="mb-3 text-[14px] font-semibold text-gray-800">Exposition par secteur</h2>
+        <div id="chart-sectors" class="h-80"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var purple = '#5B50E5', red = '#DC2626', green = '#16A34A', blue = '#0284C7', amber = '#D97706';
+    var grid = { borderColor: '#E2E8F0', strokeDashArray: 4 };
+
+    // 1. Trend — exposure bars + NPL lines
+    new ApexCharts(document.querySelector('#chart-trend'), {
+        chart: { type: 'line', height: 288, toolbar: { show: false }, animations: { enabled: false } },
+        series: [
+            { name: 'Encours actifs (Md XAF)', type: 'column', data: {{ trend_exposure_json|safe }} },
+            { name: 'Encours NPL (Md XAF)', type: 'line', data: {{ trend_npl_json|safe }} },
+        ],
+        xaxis: { categories: {{ trend_labels_json|safe }}, axisBorder: { show: false }, axisTicks: { show: false }, tickAmount: 12 },
+        colors: [purple, red],
+        stroke: { width: [0, 3] },
+        plotOptions: { bar: { columnWidth: '55%', borderRadius: 3 } },
+        grid: grid,
+        legend: { position: 'top', horizontalAlign: 'right', fontSize: '12px' },
+        tooltip: { shared: true, intersect: false },
+        dataLabels: { enabled: false },
+    }).render();
+
+    // 2. Risk bands donut
+    new ApexCharts(document.querySelector('#chart-bands'), {
+        chart: { type: 'donut', height: 288, animations: { enabled: false } },
+        series: {{ bands_values_json|safe }},
+        labels: {{ bands_names_json|safe }},
+        colors: [green, blue, amber, red].slice(4 - {{ bands|length }}),
+        stroke: { width: 1, colors: ['#fff'] },
+        legend: { position: 'bottom', fontSize: '12px' },
+        dataLabels: { fontSize: '11px', formatter: function (v) { return v.toFixed(0); } },
+    }).render();
+
+    // 3. Exposure by country — horizontal bars
+    new ApexCharts(document.querySelector('#chart-countries'), {
+        chart: { type: 'bar', height: 320, toolbar: { show: false }, animations: { enabled: false } },
+        series: [{ name: 'Encours (Md XAF)', data: {{ country_values_json|safe }} }],
+        xaxis: { categories: {{ country_names_json|safe }} },
+        colors: [purple],
+        plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: '55%' } },
+        grid: grid,
+        dataLabels: { enabled: true, textAnchor: 'start', offsetX: 4, fontSize: '11px' },
+        xaxis: { labels: { formatter: function (v) { return v.toFixed(0); } } },
+    }).render();
+
+    // 4. Exposure by sector — vertical bars
+    new ApexCharts(document.querySelector('#chart-sectors'), {
+        chart: { type: 'bar', height: 320, toolbar: { show: false }, animations: { enabled: false } },
+        series: [{ name: 'Encours (Md XAF)', data: {{ sector_values_json|safe }} }],
+        xaxis: { categories: {{ sector_names_json|safe }} },
+        colors: [blue],
+        plotOptions: { bar: { borderRadius: 4, columnWidth: '55%' } },
+        grid: grid,
+        dataLabels: { enabled: false },
+        xaxis: { labels: { rotate: -20, trim: true } },
+    }).render();
+});
+</script>
+{% endblock %}

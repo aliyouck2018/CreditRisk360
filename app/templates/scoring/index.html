@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Scoring explicable — {{ app_name }}{% endblock %}
+{% block breadcrumb_current %}Scoring explicable{% endblock %}
+
+{% block content %}
+<div class="mb-5">
+    <h1 class="text-[22px] font-bold text-gray-900">Scorecard Explicable (W1)</h1>
+    <p class="text-[13px] text-gray-500">Formule canonique Score = 300 + 550 × Σ(Poids<sub>i</sub> × Sous-score<sub>i</sub>) — chaque sous-score comparé au profil moyen du portefeuille.</p>
+</div>
+
+<!-- selector -->
+<div class="rounded-xl border border-card-border bg-white p-4">
+    <form method="get" class="flex flex-wrap items-end gap-3">
+        <div class="flex-1 min-w-[240px]">
+            <label class="mb-1 block text-[11px] font-medium text-gray-500">Emprunteur à explorer</label>
+            <select name="borrower" onchange="this.form.submit()"
+                    class="w-full rounded-lg border border-card-border px-3 py-2 text-[13px] focus:border-primary outline-none">
+                {% for p in pool %}
+                <option value="{{ p.borrower_id }}" {% if p.borrower_id == selected_row.borrower_id %}selected{% endif %}>
+                    {{ p.display_name }} — {{ p.country_name }} (score max DPD {{ p.max_dpd }} j)
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <!-- demo shortcuts -->
+        <div class="flex gap-2">
+            {% for p in pool[0:0 + 6] %}
+            {% if p.borrower_id.startswith('BRW-DEMO') %}
+            <a href="?borrower={{ p.borrower_id }}" class="rounded-lg border border-card-border px-3 py-2 text-[12px] font-medium text-gray-600 hover:border-primary hover:text-primary">
+                {{ p.display_name }}
+            </a>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </form>
+</div>
+
+{% if scored %}
+<!-- Score card -->
+<div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
+    <div class="rounded-xl border border-card-border bg-white p-5">
+        <div class="text-[11px] font-medium text-gray-500">Score final</div>
+        {% set band_hex = {'Faible':'#16A34A','Modéré':'#0284C7','Élevé':'#D97706','Très Élevé':'#DC2626'}[scored.risk_band] %}
+        <div class="text-[36px] font-extrabold" style="color: {{ band_hex }}">{{ scored.score }}</div>
+        <div class="text-[12px] text-gray-500">Bande <b style="color: {{ band_hex }}">{{ scored.risk_band }}</b> · somme pondérée {{ '{{ }}'|replace('{{ }}', '%.3f'|format(scored.weighted)) }}</div>
+        <div class="mt-3 h-2.5 w-full rounded-full bg-canvas overflow-hidden relative">
+            <div class="h-2.5 rounded-full" style="width: {{ ((scored.score - 300) / 550 * 100)|round(0, 'floor') }}%; background: {{ band_hex }}"></div>
+        </div>
+        <div class="mt-1 flex justify-between text-[10px] text-gray-400"><span>300</span><span>850</span></div>
+        <!-- subscores table -->
+        <table class="mt-4 w-full text-[12px]">
+            <thead>
+                <tr class="text-[10px] uppercase text-gray-400">
+                    <th class="text-left font-medium">Sous-score</th>
+                    <th class="text-center font-medium">Valeur</th>
+                    <th class="text-center font-medium">Portefeuille</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for key, (label, w) in weights.items() %}
+            <tr>
+                <td class="py-1 text-gray-600">{{ label }} <span class="text-gray-300">(×{{ w }})</span></td>
+                <td class="py-1 text-center font-semibold text-gray-800">{{ '%0.2f'|format(scored.contributions[loop.index0].subscore) }}</td>
+                <td class="py-1 text-center text-gray-400">{{ '%0.2f'|format(portfolio_avg[key]) }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- contributions -->
+    <div class="xl:col-span-2 rounded-xl border border-card-border bg-white p-5">
+        <h2 class="text-[14px] font-semibold text-gray-800 mb-1">Décomposition en points (vs portefeuille)</h2>
+        <p class="text-[11px] text-gray-400 mb-4">Barres positives = contributions favorables au score ; barres rouges = pénalités.</p>
+        <div class="space-y-3">
+            {% for c in scored.contributions %}
+            {% set delta = c.delta %}
+            {% set width = ((delta|abs / 550 * 400) )|round|int %}
+            <div class="text-[12px]">
+                <div class="flex justify-between mb-1">
+                    <span class="font-medium text-gray-700">{{ c.label }}</span>
+                    <span class="{{ 'text-badge-green-fg' if delta >= 0 else 'text-badge-red-fg' }} font-bold">
+                        {{ '%+d'|format(c.delta) }} pts · sous-score {{ '%0.2f'|format(c.subscore) }} = {{ c.points }} pts ← poids
+                    </span>
+                </div>
+                <div class="flex items-center h-4 bg-canvas rounded-lg overflow-hidden">
+                    {% if delta >= 0 %}
+                    <div class="h-4 rounded-lg" style="width: calc(50% + {{ width * 2 }}px); background: linear-gradient(90deg,#DCFCE7,#16A34A); margin-left: -{{ 400 - width * 2 }}px"></div>
+                    {% else %}
+                    <div class="h-4 rounded-lg ml-auto" style="width: {{ width * 2 }}px; background: linear-gradient(90deg,#DC2626,#FCA5A5)"></div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

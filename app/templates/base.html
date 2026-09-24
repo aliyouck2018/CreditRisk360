@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sidebar: '#111827',
+                        'sidebar-text': '#9CA3AF',
+                        primary: { DEFAULT: '#5B50E5', hover: '#4F46E5' },
+                        canvas: '#F8FAFC',
+                        card: '#FFFFFF',
+                        'card-border': '#E2E8F0',
+                        'kpi-purple-bg': '#EEF2FF', 'kpi-purple-fg': '#4F46E5',
+                        'kpi-green-bg': '#ECFDF5', 'kpi-green-fg': '#059669',
+                        'kpi-blue-bg': '#EFF6FF', 'kpi-blue-fg': '#2563EB',
+                        'kpi-amber-bg': '#FFFBEB', 'kpi-amber-fg': '#D97706',
+                        'kpi-red-bg': '#FEF2F2', 'kpi-red-fg': '#DC2626',
+                        'badge-amber-bg': '#FEF3C7', 'badge-amber-fg': '#D97706',
+                        'badge-blue-bg': '#E0F2FE', 'badge-blue-fg': '#0284C7',
+                        'badge-green-bg': '#DCFCE7', 'badge-green-fg': '#16A34A',
+                        'badge-red-bg': '#FEE2E2', 'badge-red-fg': '#DC2626',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                    },
+                },
+            },
+        };
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    {% block head %}{% endblock %}
+</head>
+<body class="h-full bg-canvas font-sans text-gray-800 antialiased">
+    <div class="flex min-h-screen">
+        <!-- ============ Sidebar ============ -->
+        <aside class="w-60 flex-shrink-0 flex-col bg-sidebar hidden lg:flex">
+            <!-- Logo -->
+            <div class="flex items-center gap-2 px-5 py-5">
+                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+                    <i data-lucide="shield-check" class="h-5 w-5 text-white"></i>
+                </div>
+                <span class="text-[15px] font-bold tracking-tight text-white">CreditRisk<span class="text-primary">360</span></span>
+            </div>
+            <!-- Nav -->
+            <nav class="mt-2 flex-1 space-y-1 px-3 overflow-y-auto">
+                <div class="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider text-sidebar-text/70">Analyse</div>
+                {% set nav_items = [
+                    ('dashboard', 'bar-chart-3', 'Tableau de bord', url_for('main.dashboard')),
+                    ('borrowers.borrower_list', 'users', 'Clients', url_for('borrowers.borrower_list')),
+                    ('risk.index', 'target', 'Risk Analytics', url_for('risk.index')),
+                    ('scoring.index', 'gauge', 'Scoring explicable', url_for('scoring.index')),
+                    ('dq.index', 'folder-check', 'Qualité des données', url_for('dq.index')),
+                    ('alerts.index', 'alert-triangle', 'Alertes (SAP)', url_for('alerts.index')),
+                    ('analyst.index', 'bot', 'Analyste IA', url_for('analyst.index')),
+                    ('simulator.index', 'sliders-horizontal', 'Stress-Test', url_for('simulator.index')),
+                ] %}
+                {% for endpoint, icon, label, href in nav_items %}
+                <a href="{{ href }}"
+                   class="flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition
+                          {% if request.endpoint == endpoint %}bg-primary text-white{% else %}text-sidebar-text hover:bg-white/5 hover:text-white{% endif %}">
+                    <i data-lucide="{{ icon }}" class="h-4 w-4"></i> {{ label }}
+                </a>
+                {% endfor %}
+                <div class="px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-wider text-sidebar-text/70">Paramètres</div>
+                <a href="{{ url_for('main.methodology') }}"
+                   class="flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition
+                          {% if request.endpoint == 'main.methodology' %}bg-primary text-white{% else %}text-sidebar-text hover:bg-white/5 hover:text-white{% endif %}">
+                    <i data-lucide="settings" class="h-4 w-4"></i> Méthodologie
+                </a>
+            </nav>
+            <!-- Footer -->
+            <div class="border-t border-white/10 p-4">
+                <div class="flex items-center gap-2 text-[11px] text-sidebar-text">
+                    <i data-lucide="database" class="h-3.5 w-3.5"></i>
+                    Données au {{ AS_OF_DATE.strftime('%d/%m/%Y') }}
+                </div>
+            </div>
+        </aside>
+
+        <!-- ============ Main column ============ -->
+        <div class="flex min-w-0 flex-1 flex-col">
+            <!-- Topbar -->
+            <header class="sticky top-0 z-20 flex items-center gap-4 border-b border-card-border bg-white px-6 py-3">
+                <!-- breadcrumb -->
+                <div class="flex min-w-0 items-center gap-2 text-[13px]">
+                    <a href="{{ url_for('main.dashboard') }}" class="hidden text-gray-400 hover:text-gray-600 md:inline">CreditRisk360</a>
+                    {% block breadcrumb %}
+                    <span class="truncate font-medium text-gray-700">{% block breadcrumb_current %}{% endblock %}</span>
+                    {% endblock %}
+                </div>
+                <div class="ml-auto flex items-center gap-3">
+                    <!-- global search -->
+                    <form action="{{ url_for('borrowers.borrower_list') }}" class="relative hidden sm:block">
+                        <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"></i>
+                        <input type="search" name="q" placeholder="Rechercher un emprunteur…"
+                               class="w-56 rounded-lg border border-card-border bg-canvas py-1.5 pl-9 pr-3 text-[13px] outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 lg:w-72">
+                    </form>
+                    <!-- as-of badge -->
+                    <span class="hidden items-center gap-1.5 rounded-full bg-kpi-blue-bg px-3 py-1 text-[11px] font-medium text-kpi-blue-fg md:inline-flex">
+                        <i data-lucide="calendar-days" class="h-3 w-3"></i> Données au {{ AS_OF_DATE.strftime('%d/%m/%Y') }}
+                    </span>
+                    <!-- synthetic data badge -->
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-badge-amber-bg px-3 py-1 text-[11px] font-medium text-badge-amber-fg">
+                        <i data-lucide="flask-conical" class="h-3 w-3"></i> Données synthétiques
+                    </span>
+                    <!-- notifications -->
+                    <a href="{{ url_for('alerts.index') }}" class="relative rounded-lg p-2 text-gray-500 hover:bg-canvas hover:text-gray-700">
+                        <i data-lucide="bell" class="h-5 w-5"></i>
+                        <span class="absolute right-1 top-1 h-2 w-2 rounded-full bg-red-500"></span>
+                    </a>
+                    <!-- profile -->
+                    <div class="flex items-center gap-2 border-l border-card-border pl-3">
+                        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-kpi-purple-bg text-[11px] font-bold text-kpi-purple-fg">JD</div>
+                        <div class="hidden leading-tight md:block">
+                            <div class="text-[13px] font-semibold text-gray-800">Jean Dupont</div>
+                            <div class="text-[11px] text-gray-400">Manager — Creditinfo CEMAC</div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content -->
+            <main class="flex-1 overflow-y-auto px-6 py-6">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    {% block scripts %}{% endblock %}
+    <script>
+        if (window.lucide) { lucide.createIcons(); }
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.lucide) { lucide.createIcons(); }
+        });
+    </script>
+</body>
+</html>

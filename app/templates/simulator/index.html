@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Stress-Test — {{ app_name }}{% endblock %}
+{% block breadcrumb_current %}Simulateur de Stress-Test{% endblock %}
+
+{% block content %}
+<div class="mb-5">
+    <h1 class="text-[22px] font-bold text-gray-900">Simulateur de Stress-Test</h1>
+    <p class="text-[13px] text-gray-500">
+        Modèle analytique : migration d'un choc p %% de l'encours sain + sensibilité taux de 1,2 %%/pt + choc sectoriel ciblé.
+        Base : encours {{ exposure|xaf }} · NPL {{ '%.1f %%'|format(npl / exposure * 100) }} · PD portefeuille {{ '%.1f %%'|format(pd_performing * 100) }} · LGD {{ '%.0f %%'|format(lgd * 100) }}.
+    </p>
+</div>
+
+<div class="grid gap-4 xl:grid-cols-2" x-data="stressSim()" x-init="compute()">
+    <!-- Parameters -->
+    <div class="rounded-xl border border-card-border bg-white p-5">
+        <h2 class="text-[14px] font-semibold text-gray-800">Paramètres de choc</h2>
+
+        <div class="mt-5">
+            <div class="mb-1 flex justify-between text-[12px]">
+                <label class="font-medium text-gray-700">Choc général de défaut</label>
+                <span class="font-bold text-kpi-purple-fg" x-text="default_shock + ' %'"></span>
+            </div>
+            <input type="range" min="0" max="100" value="0" class="w-full accent-[#5B50E5]"
+                   x-model.number="default_shock" @input="compute()">
+        </div>
+
+        <div class="mt-5">
+            <div class="mb-1 flex justify-between text-[12px]">
+                <label class="font-medium text-gray-700">Hausse des taux</label>
+                <span class="font-bold text-kpi-amber-fg" x-text="'+' + rate_shock + ' pts'"></span>
+            </div>
+            <input type="range" min="0" max="5" step="0.5" value="0" class="w-full accent-amber-500"
+                   x-model.number="rate_shock" @input="compute()">
+        </div>
+
+        <div class="mt-5">
+            <div class="mb-1 flex justify-between text-[12px]">
+                <label class="font-medium text-gray-700">Choc sectoriel</label>
+                <span class="font-bold text-kpi-red-fg" x-text="target_sector ? '+' + sector_shock + ' %' : 'aucun'"></span>
+            </div>
+            <input type="range" min="0" max="100" value="0" class="w-full accent-red-500"
+                   x-model.number="sector_shock" @input="compute()" :disabled="!target_sector">
+            <select x-model.number="target_sector" @change="compute()"
+                    class="mt-2 w-full rounded-lg border border-card-border px-3 py-2 text-[13px] focus:border-primary outline-none">
+                <option value="">— Secteur ciblé —</option>
+                {% for s in sectors %}
+                <option value="{{ s }}">{{ s }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="rounded-xl border border-card-border bg-white p-5">
+        <h2 class="text-[14px] font-semibold text-gray-800">Sorties comparées</h2>
+        <div class="mt-4 grid grid-cols-2 gap-3">
+            <div class="rounded-lg border border-gray-100 p-3">
+                <div class="text-[11px] text-gray-500">Base</div>
+                <div class="text-[20px] font-bold text-gray-900" x-text="base ? base.npl_ratio + ' %' : '—'">—</div>
+                <div class="text-[11px] text-gray-400">Ratio NPL</div>
+            </div>
+            <div class="rounded-lg border border-gray-100 p-3">
+                <div class="text-[11px] text-gray-500">Stress</div>
+                <div class="text-[20px] font-bold text-badge-red-fg" x-text="stress ? stress.npl_ratio + ' %' : '—'" id="stress-npl">—</div>
+                <div class="text-[11px] text-gray-400">Ratio NPL</div>
+            </div>
+            <div class="rounded-lg border border-gray-100 p-3">
+                <div class="text-[11px] text-gray-500">Perte attendue</div>
+                <div class="text-[20px] font-bold text-gray-900" x-text="base ? fmt(base.el) : '—'">—</div>
+                <div class="text-[11px] text-gray-400">Base — Md XAF</div>
+            </div>
+            <div class="rounded-lg border border-gray-100 p-3">
+                <div class="text-[11px] text-gray-500">Perte attendue</div>
+                <div class="text-[20px] font-bold text-badge-red-fg" x-text="stress ? fmt(stress.el) : '—'">—</div>
+                <div class="text-[11px] text-gray-400">Stress — Md XAF</div>
+            </div>
+        </div>
+        <div id="chart-stress" class="mt-4 h-56"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function fmt(v) {
+    return (v / 1e9).toFixed(2) + ' Md XAF';
+}
+
+function stressSim() {
+    return {
+        default_shock: 0,
+        rate_shock: 0,
+        sector_shock: 0,
+        target_sector: '',
+        base: null,
+        stress: null,
+        chart: null,
+        async compute() {
+            const res = await fetch('{{ url_for("api.stress_compute") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    default_shock: this.default_shock,
+                    rate_shock: this.rate_shock,
+                    sector_shock: this.sector_shock,
+                    target_sector: this.target_sector,
+                })
+            });
+            const data = await res.json();
+            if (!data.ok) return;
+            this.base = data.base;
+            this.stress = data.stress;
+            this.renderChart();
+        },
+        renderChart() {
+            const opts = {
+                chart: { type: 'bar', height: 224, toolbar: { show: false }, animations: { enabled: false } },
+                series: [
+                    { name: "Ratio NPL (%)", data: [this.base.npl_ratio, this.stress.npl_ratio] },
+                    { name: "Perte attendue (Md XAF)", data: [+(this.base.el / 1e9).toFixed(2), +(this.stress.el / 1e9).toFixed(2)] },
+                ],
+                xaxis: { categories: ['Base', 'Scénario stress'] },
+                colors: ['#0284C7', '#DC2626'],
+                dataLabels: { enabled: true, fontSize: '10px' },
+                grid: { borderColor: '#E2E8F0', strokeDashArray: 4 },
+                plotOptions: { bar: { borderRadius: 4, columnWidth: '45%' } },
+                legend: { position: 'top', fontSize: '11px' },
+            };
+            if (this.chart) { this.chart.updateOptions(opts); }
+            else {
+                this.chart = new ApexCharts(document.querySelector('#chart-stress'), opts);
+                this.chart.render();
+            }
+        },
+    };
+}
+</script>
+{% endblock %}

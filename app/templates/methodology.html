@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Méthodologie — {{ app_name }}{% endblock %}
+{% block breadcrumb_current %}Méthodologie{% endblock %}
+
+{% block content %}
+<div class="mb-5">
+    <h1 class="text-[22px] font-bold text-gray-900">Méthodologie &amp; Dictionnaire de données</h1>
+    <p class="text-[13px] text-gray-500">Définitions canoniques, formules et scénarios injectés dans les données synthétiques.</p>
+</div>
+
+<div class="space-y-4">
+    <!-- Definitions -->
+    <div class="rounded-xl border border-card-border bg-white p-5">
+        <h2 class="mb-3 text-[14px] font-semibold text-gray-800">1. Définitions canoniques des indicateurs</h2>
+        <table class="w-full text-[13px]">
+            <thead>
+                <tr class="border-b border-card-border bg-canvas text-left text-[11px] uppercase text-gray-500">
+                    <th class="px-3 py-2 font-semibold">Indicateur</th>
+                    <th class="px-3 py-2 font-semibold">Définition stricte</th>
+                    <th class="px-3 py-2 font-semibold">Implémentation</th>
+                </tr>
+            </thead>
+            <tbody class="text-[12.5px]">
+                <tr class="border-b border-gray-100"><td class="px-3 py-2 font-medium text-gray-700">Exposition</td><td class="px-3 py-2 text-gray-600">Encours restant dû (<code>loans.outstanding_amount</code>), jamais le capital initial.</td><td class="px-3 py-2 text-gray-500"><code>app/metrics.py</code></td></tr>
+                <tr class="border-b border-gray-100"><td class="px-3 py-2 font-medium text-gray-700">Ratio NPL</td><td class="px-3 py-2 text-gray-600">Encours des prêts avec DPD ≥ 90 j / Encours total actif.</td><td class="px-3 py-2 text-gray-500"><code>app/metrics.py</code></td></tr>
+                <tr class="border-b border-gray-100"><td class="px-3 py-2 font-medium text-gray-700">Taux de défaut 12 m</td><td class="px-3 py-2 text-gray-600">Prêts franchissant 90 jours de retard sur 12 derniers mois / actifs 12 mois plus tôt.</td><td class="px-3 py-2 text-gray-500"><code>app/metrics.py</code></td></tr>
+                <tr class="border-b border-gray-100"><td class="px-3 py-2 font-medium text-gray-700">Taux de paiement</td><td class="px-3 py-2 text-gray-600">Σ montants payés / Σ montants échus à la date de référence.</td><td class="px-3 py-2 text-gray-500"><code>app/metrics.py</code></td></tr>
+                <tr class="border-b border-gray-100"><td class="px-3 py-2 font-medium text-gray-700">Score (scorecard)</td><td class="px-3 py-2 text-gray-600">Score = 300 + 550 × Σ(Poids<sub>i</sub> × Sous-score<sub>i</sub>), sous-scores dans [0, 1].</td><td class="px-3 py-2 text-gray-500"><code>app/services/scoring.py</code></td></tr>
+                <tr class="border-b border-gray-100"><td class="px-3 py-2 font-medium text-gray-700">Dossier vierge</td><td class="px-3 py-2 text-gray-600">0 retard sur 24 mois, aucun impayé, aucun défaut, aucune restructuration.</td><td class="px-3 py-2 text-gray-500">—</td></tr>
+                <tr class="border-b border-gray-100"><td class="px-3 py-2 font-medium text-gray-700">Date de référence</td><td class="px-3 py-2 text-gray-600"><code>AS_OF_DATE = 2026-08-31</code> — aucune donnée après cette date.</td><td class="px-3 py-2 text-gray-500">Seed + config</td></tr>
+                <tr><td class="px-3 py-2 font-medium text-gray-700">Concentration</td><td class="px-3 py-2 text-gray-600">HHI = Σ s<sub>i</sub><sup>2</sup> × 10 000 ; limites : secteur ≤ 25 % du pays, emprunteur ≤ 2 %.</td><td class="px-3 py-2 text-gray-500"><code>app/routes/risk.py</code></td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Dictionary -->
+    <div class="rounded-xl border border-card-border bg-white p-5">
+        <h2 class="mb-3 text-[14px] font-semibold text-gray-800">Dictionnaire de données (tables & vues)</h2>
+        <div class="grid gap-3 md:grid-cols-2 text-[12.5px]">
+            <div class="rounded-lg border border-gray-100 p-3">
+                <p class="font-mono font-semibold text-kpi-purple-fg">v_loans_enriched</p>
+                <p class="mt-1 text-gray-600">Loans + borrowers + institutions + countries (exposition, statut, segment).</p>
+            </div>
+            <div class="rounded-lg border border-gray-100 p-3">
+                <p class="font-mono font-semibold text-kpi-purple-fg">v_kpi_monthly</p>
+                <p class="mt-1 text-gray-600">Encours total, encours NPL et ratio par mois (24 mois glissants).</p>
+            </div>
+            <div class="rounded-lg border border-gray-100 p-3">
+                <p class="font-mono font-semibold text-kpi-purple-fg">v_segment_monthly</p>
+                <p class="mt-1 text-gray-600">Agrégation mensuelle par (Pays × Secteur × Type) — entrée du SAP.</p>
+            </div>
+            <div class="rounded-lg border border-gray-100 p-3">
+                <p class="font-mono font-semibold text-kpi-purple-fg">v_borrower_metrics</p>
+                <p class="mt-1 text-gray-600">Métriques par emprunteur (dpd max, ratio de paiement, defaults, enquêtes) — entrée du moteur de score.</p>
+            </div>
+            <div class="rounded-lg border border-gray-100 p-3">
+                <p class="font-mono font-semibold text-kpi-purple-fg">loan_monthly</p>
+                <p class="mt-1 text-gray-600">Table de faits mensuelle (outstanding, DPD, bucket) — analyse vintage.</p>
+            </div>
+            <div class="rounded-lg border border-gray-100 p-3">
+                <p class="font-mono font-semibold text-kpi-purple-fg">app_state_dq_resolutions</p>
+                <p class="mt-1 text-gray-600">Workflow de correction DQ (DETECTED → INVESTIGATING → RESOLVED).</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scenario -->
+    <div class="rounded-xl border border-card-border bg-white p-5">
+        <h2 class="mb-3 text-[14px] font-semibold text-gray-800">Scénarios synthétiques injectés</h2>
+        <div class="grid gap-3 md:grid-cols-3 text-[12.5px]">
+            <div class="rounded-lg border border-gray-100 p-3">
+                <p class="font-semibold text-gray-800">S1 — Dérive BTP Cameroun</p>
+                <p class="mt-1 text-gray-600">Grille de retards ≥ 30 jours sur les prêts récents du segment (visible sur l'onglet Alertes SAP).</p>
+            </div>
+            <div class="rounded-lg border border-gray-100 p-3">
+                <p class="font-semibold text-gray-800">S2 — Emprunteur > 2 %% / secteur Tchad > 25 %%</p>
+                <p class="mt-1 text-gray-600">Borrower unique et concentration secteur (Risk Analytics, limites réglementaires).</p>
+            </div>
+            <div class="rounded-lg border border-gray-100 p-3">
+                <p class="font-semibold text-gray-800">S3 — Cohortes 2025 dégradées</p>
+                <p class="mt-1 text-gray-600">Taux de défaut 12 m plus élevé pour les cohortes 2025 (courbes vintage).</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="rounded-xl bg-kpi-purple-bg px-5 py-4 text-[12px] text-kpi-purple-fg">
+        <i data-lucide="flask-conical" class="mr-1 inline h-3.5 w-3.5"></i>
+        <b>Note :</b> 100 %% des données (emprunteurs, prêts, paiements, consultations, anomalies DQ) sont générées de façon déterministe par <code>seed_supabase.py</code> (graine = 42), as-of 31/08/2026.
+    </div>
+</div>
+{% endblock %}
