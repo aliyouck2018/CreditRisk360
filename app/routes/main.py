@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template
 
-from app import metrics
+from app.services.db import query
 
 main_bp = Blueprint("main", __name__)
 
@@ -12,27 +12,20 @@ def index():
 
 @main_bp.route("/dashboard")
 def dashboard():
-    kpi = metrics.kpi_summary()
-    trend = metrics.monthly_trend()
-    bands = metrics.risk_band_distribution()
-    countries = metrics.exposure_by_country()
-    sectors = metrics.exposure_by_sector()
-    import json
-    ctx = {
-        "kpi": kpi,
-        "trend": trend,
-        "bands": bands,
-        "trend_labels_json": json.dumps(trend["labels"]),
-        "trend_exposure_json": json.dumps(trend["exposure"]),
-        "trend_npl_json": json.dumps(trend["npl"]),
-        "bands_names_json": json.dumps([b["name"] for b in bands]),
-        "bands_values_json": json.dumps([b["value"] for b in bands]),
-        "country_names_json": json.dumps([c["name"] for c in countries]),
-        "country_values_json": json.dumps([round(c["value"] / 1e9, 1) for c in countries]),
-        "sector_names_json": json.dumps([s["name"] for s in sectors]),
-        "sector_values_json": json.dumps([round(s["value"] / 1e9, 1) for s in sectors]),
-    }
-    return render_template("dashboard.html", **ctx)
+    from app.services.dashboard import get_dashboard_context
+    return render_template("dashboard.html", **get_dashboard_context())
+
+
+@main_bp.route("/reports")
+def reports():
+    demos = query(
+        """
+        SELECT b.borrower_id, b.display_name, b.borrower_type, c.name_short_fr AS country_name
+        FROM borrowers b LEFT JOIN countries c ON c.country_code = b.country
+        WHERE b.is_demo OR b.borrower_id ILIKE 'BRW-DEMO%%'
+        ORDER BY b.borrower_id
+        """)
+    return render_template("reports.html", demos=demos)
 
 
 @main_bp.route("/methodology")

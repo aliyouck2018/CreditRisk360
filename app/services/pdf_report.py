@@ -115,7 +115,7 @@ def generate_credit_report(borrower_id: str) -> bytes:
         [Paragraph(f"<b>{b['display_name']}</b> · {b.get('country_name') or '—'} · "
                    f"{type_label} · "
                    f"ID {b['borrower_id']}", ParagraphStyle("sub", fontSize=9.5, textColor=colors.white, leading=13)),
-         Paragraph(f"Données au {metrics.as_of_date().strftime('%d/%m/%Y')} — Creditinfo Central Africa (interface de démonstration)",
+         Paragraph(f"Données au {metrics.as_of_date().strftime('%d/%m/%Y')} — Bantu Scoring SA (interface de démonstration)",
                    ParagraphStyle("sub2", fontSize=7.5, alignment=2, textColor=colors.HexColor("#9CA3AF"), leading=9))],
     ], colWidths=[120 * mm, 58 * mm])
     title_tbl.setStyle(TableStyle([
@@ -190,7 +190,7 @@ def generate_credit_report(borrower_id: str) -> bytes:
         story.append(Image(chart, width=178 * mm, height=178 * 2.2 / 7.0))
     story.append(Paragraph(
         "<i>Ce rapport est généré automatiquement par CreditRisk360 sur données 100% synthétiques. "
-        "Aucune information réelle d'emprunteur n'est utilisée. Source : interface Creditinfo Central Africa (démo).</i>",
+        "Aucune information réelle d'emprunteur n'est utilisée. Source : interface Bantu Scoring SA (démo).</i>",
         ParagraphStyle("foot", parent=body, fontSize=7, textColor=colors.HexColor("#6B7280"))))
 
     doc.build(story)

@@ -3,102 +3,333 @@
 {% block breadcrumb_current %}Tableau de bord{% endblock %}
 
 {% block content %}
-<div class="mb-5">
-    <h1 class="text-[22px] font-bold text-gray-900">Tableau de bord exécutif</h1>
-    <p class="text-[13px] text-gray-500">Vue synthétique du portefeuille de crédit CEMAC — données synthétiques au {{ AS_OF_DATE.strftime('%d/%m/%Y') }}.</p>
-</div>
-
-<!-- KPI grid -->
-<div class="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
-    {% with icon='wallet', icon_bg='bg-kpi-purple-bg', icon_fg='text-kpi-purple-fg', label='Encours total', value=kpi.exposure|xaf, subtitle='Encours restant dû' %}{% include 'partials/kpi_card.html' %}{% endwith %}
-    {% with icon='users', icon_bg='bg-kpi-blue-bg', icon_fg='text-kpi-blue-fg', label='Emprunteurs', value=kpi.borrower_count|num, subtitle='Clients référencés' %}{% include 'partials/kpi_card.html' %}{% endwith %}
-    {% with icon='file-signature', icon_bg='bg-kpi-green-bg', icon_fg='text-kpi-green-fg', label='Prêts actifs', value=kpi.active_loan_count|num, subtitle=kpi.closed_loan_count|num ~ ' clôturés' %}{% include 'partials/kpi_card.html' %}{% endwith %}
-    {% with icon='alert-circle', icon_bg='bg-kpi-red-bg', icon_fg='text-kpi-red-fg', label='Ratio NPL', value='%.1f %%'|format(kpi.npl_ratio), subtitle='Encours en défaut +90 j' %}{% include 'partials/kpi_card.html' %}{% endwith %}
-    {% with icon='trending-down', icon_bg='bg-kpi-amber-bg', icon_fg='text-kpi-amber-fg', label='Défaut 12 mois', value='%.1f %%'|format(kpi.default_rate_12m), subtitle='Franchissement 90 j' %}{% include 'partials/kpi_card.html' %}{% endwith %}
-    {% with icon='timer', icon_bg='bg-kpi-blue-bg', icon_fg='text-kpi-blue-fg', label='Taux de paiement', value='%.1f %%'|format(kpi.payment_rate), subtitle='Payé / échu à date' %}{% include 'partials/kpi_card.html' %}{% endwith %}
-</div>
-
-<!-- Charts -->
-<div class="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-3">
-    <div class="rounded-xl border border-card-border bg-white p-5 xl:col-span-2">
-        <div class="mb-3 flex items-center justify-between">
-            <h2 class="text-[14px] font-semibold text-gray-800">Évolution encours &amp; NPL</h2>
-            <span class="text-[11px] text-gray-400">{{ trend.labels|first }} → {{ trend.labels|last }} (Md XAF)</span>
+<div x-data="dashCharts()">
+    <!-- ══════════ 1. HEADER + FILTRES ══════════ -->
+    <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <h1 class="text-[22px] font-bold text-gray-900">Credit Risk Dashboard</h1>
+            <p class="text-[13px] text-gray-500">Vue d'ensemble du portefeuille et suivi du risque — données synthétiques au {{ as_of.strftime('%d/%m/%Y') }}.</p>
         </div>
-        <div id="chart-trend" class="h-72"></div>
+        <!-- filters -->
+        <form method="get" class="flex flex-wrap items-end gap-2.5 text-[12.5px]">
+            <div>
+                <label class="block text-[10.5px] font-medium uppercase text-gray-400">Pays</label>
+                <select name="country" class="mt-0.5 rounded-lg border border-card-border bg-white px-2.5 py-1.5 focus:border-primary outline-none">
+                    <option value="">Tous</option>
+                    {% for c in countries %}
+                    <option value="{{ c.country_code }}" {% if c.country_code == filters.country %}selected{% endif %}>{{ c.name_short_fr }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-[10.5px] font-medium uppercase text-gray-400">Secteur</label>
+                <select name="sector" class="mt-0.5 rounded-lg border border-card-border bg-white px-2.5 py-1.5 focus:border-primary outline-none">
+                    <option value="">Tous</option>
+                    {% for s in sectors %}
+                    <option value="{{ s.sector }}" {% if s.sector == filters.sector %}selected{% endif %}>{{ s.sector }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-[10.5px] font-medium uppercase text-gray-400">Type</label>
+                <select name="type" class="mt-0.5 rounded-lg border border-card-border bg-white px-2.5 py-1.5 focus:border-primary outline-none">
+                    <option value="">Tous</option>
+                    {% for tc, tl in types %}
+                    <option value="{{ tc }}" {% if tc == filters.type %}selected{% endif %}>{{ tl }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-[10.5px] font-medium uppercase text-gray-400">Fenêtre</label>
+                <select name="months" class="mt-0.5 rounded-lg border border-card-border bg-white px-2.5 py-1.5 focus:border-primary outline-none">
+                    {% for m in (12, 18, 24) %}
+                    <option value="{{ m }}" {% if m == filters.months %}selected{% endif %}>{{ m }} mois</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button class="rounded-lg bg-primary px-4 py-2 font-medium text-white hover:bg-primary-hover transition">Appliquer</button>
+            {% if filters.country or filters.sector or filters.type %}
+            <a href="{{ url_for('main.dashboard') }}" class="rounded-lg border border-card-border bg-white px-3 py-2 font-medium text-gray-500 hover:text-gray-700">×</a>
+            {% endif %}
+        </form>
     </div>
-    <div class="rounded-xl border border-card-border bg-white p-5">
-        <h2 class="mb-3 text-[14px] font-semibold text-gray-800">Bandes de risque (échantillon)</h2>
-        <div id="chart-bands" class="h-72"></div>
+
+    <!-- ══════════ 2. EXECUTIVE SNAPSHOT — KPIs avec tendance vs mois précédent ══════════ -->
+    <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div class="flex items-center gap-4 rounded-xl border border-card-border bg-white px-5 py-4">
+            <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-kpi-purple-bg">
+                <i data-lucide="wallet" class="h-5 w-5 text-kpi-purple-fg"></i>
+            </div>
+            <div class="min-w-0">
+                <div class="text-[11.5px] font-medium text-gray-500">Exposition totale</div>
+                <div class="text-[20px] font-bold text-gray-900">{{ kpis.exposure|xaf }}</div>
+                <div class="text-[11px] text-gray-500">Encours restant dû{% if kpis.exposure_delta %} · {{ '%+.1f'|format(kpis.exposure_delta / 1e9) }} Md vs mois précédent{% endif %}</div>
+            </div>
+        </div>
+        <div class="flex items-center gap-4 rounded-xl border border-card-border bg-white px-5 py-4">
+            <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-kpi-red-bg">
+                <i data-lucide="alert-circle" class="h-5 w-5 text-kpi-red-fg"></i>
+            </div>
+            <div class="min-w-0">
+                <div class="text-[11.5px] font-medium text-gray-500">Ratio NPL <span class="text-gray-400">(DPD ≥ 90 j)</span></div>
+                <div class="text-[20px] font-bold text-badge-red-fg">{{ '%.1f %%'|format(kpis.npl_ratio) }}</div>
+                <div class="text-[11px] text-gray-500">Part de l'encours en difficulté — échantillon non performant</div>
+            </div>
+        </div>
+        <div class="flex items-center gap-4 rounded-xl border border-card-border bg-white px-5 py-4">
+            <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-kpi-amber-bg">
+                <i data-lucide="alarm-clock" class="h-5 w-5 text-kpi-amber-fg"></i>
+            </div>
+            <div class="min-w-0">
+                <div class="text-[11.5px] font-medium text-gray-500">Encours en retard (1-90 j)</div>
+                <div class="text-[20px] font-bold text-kpi-amber-fg">{{ '%.1f %%'|format(kpis.dpd_ratio) }}</div>
+                <div class="text-[11px] text-gray-500">Signaux de stress précoces</div>
+            </div>
+        </div>
+        <div class="flex items-center gap-4 rounded-xl border border-card-border bg-white px-5 py-4">
+            <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-kpi-blue-bg">
+                <i data-lucide="timer" class="h-5 w-5 text-kpi-blue-fg"></i>
+            </div>
+            <div class="min-w-0">
+                <div class="text-[11.5px] font-medium text-gray-500">Taux de paiement (12 m)</div>
+                <div class="text-[20px] font-bold text-gray-900">{{ '%.1f %%'|format(kpis.payment_rate) }}</div>
+                <div class="text-[11px] text-gray-500">Payé / échu à date</div>
+            </div>
+        </div>
     </div>
-    <div class="rounded-xl border border-card-border bg-white p-5">
-        <h2 class="mb-3 text-[14px] font-semibold text-gray-800">Exposition par pays</h2>
-        <div id="chart-countries" class="h-80"></div>
+
+    <p class="mt-2 text-[11px] text-gray-400">
+        <i data-lucide="info" class="mr-1 inline h-3 w-3"></i>
+        Le ratio NPL est rapporté à l'encours total du portefeuille, tandis que le taux de paiement
+        compare les échéances dues à la date de référence. Ces deux métriques n'ont pas le même
+        dénominateur — elles ne sont donc pas contradictoires si toutes deux semblent élevées. Voir
+        <a class="text-primary" href="{{ url_for('main.methodology') }}">Méthodologie</a>.
+    </p>
+
+    <!-- ══════════ 3. TENDANCE DU PORTEFEUILLE ══════════ -->
+    <div class="mt-6 rounded-xl border border-card-border bg-white p-5">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-[14px] font-semibold text-gray-800">Évolution du portefeuille</h2>
+                <p class="text-[11.5px] text-gray-500">Le portefeuille s'améliore-t-il ou se dégrade-t-il&nbsp;? {{ trend.labels|first }} → {{ trend.labels|last }}. (portefeuille complet)</p>
+            </div>
+            <div x-data="{ metric: 'exposure' }" class="flex gap-1.5">
+                <button @click="metric = 'exposure'; renderAll()"
+                        :class="metric === 'exposure' ? 'bg-primary text-white' : 'bg-canvas text-gray-600'"
+                        class="rounded-lg px-3 py-1.5 text-[11.5px] font-medium">Encours</button>
+                <button @click="metric = 'npl'; renderAll()"
+                        :class="metric === 'npl' ? 'bg-primary text-white' : 'bg-canvas text-gray-500'"
+                        class="rounded-lg px-3 py-1.5 font-medium text-[11.5px]">Encours NPL</button>
+                <button @click="metric = 'ratio'; renderAll()"
+                        :class="metric === 'ratio' ? 'bg-primary text-white' : 'bg-canvas text-gray-500'"
+                        class="rounded-lg px-3 py-1.5 font-medium text-[11.5px]">Ratio NPL (%)</button>
+            </div>
+        </div>
+        <div id="chart-trend" class="mt-3 h-72"></div>
     </div>
-    <div class="rounded-xl border border-card-border bg-white p-5 xl:col-span-2">
-        <h2 class="mb-3 text-[14px] font-semibold text-gray-800">Exposition par secteur</h2>
-        <div id="chart-sectors" class="h-80"></div>
+
+    <!-- ══════════ 4. QUALITÉ DU PORTEFEUILLE (buckets DPD) ══════════ -->
+    <div class="mt-4 grid gap-4 xl:grid-cols-2">
+        <div class="rounded-xl border border-card-border bg-white p-5">
+            <h2 class="text-[14px] font-semibold text-gray-800">Distribution des retards (buckets DPD)</h2>
+            <p class="text-[11.5px] text-gray-500">Quelle part du portefeuille est à jour en fonction des signes d'un stress&nbsp;? — au mois de référence</p>
+            <div class="mt-3 grid grid-cols-5 gap-2 text-center">
+                {% set bcolors = {'CURRENT': ('bg-badge-green-bg','text-badge-green-fg'), '1-30': ('bg-badge-amber-bg', 'text-badge-amber-fg'), '31-60': ('bg-badge-amber-bg','text-badge-amber-fg'), '61-90': ('bg-badge-red-bg','text-badge-red-fg'), '90+': ('bg-badge-red-bg','text-badge-red-fg')} %}
+                {% for b in bucket_order %}
+                {% set val = dist | selectattr('bucket', 'equalto', b) | list %}
+                {% set ex = (val[0].exposure if val else 0) %}
+                <div class="rounded-lg border border-gray-100 p-2.5">
+                    <div class="text-[11px] text-gray-500">{{ bucket_labels[b] }}</div>
+                    <div class="text-[13px] font-bold {{ bcolors[b][1] }}">{{ '%.1f %%'|format(ex / (kpis.exposure or 1) * 100) }}</div>
+                    <div class="text-[10.5px] text-gray-400">{{ ex|xaf }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            <div id="chart-dist" class="mt-2 h-52"></div>
+        </div>
+
+        <!-- ══════════ 5. OÙ EST LE RISQUE ? ══════════ -->
+        <div class="rounded-xl border border-card-border bg-white p-5">
+            <h2 class="text-[14px] font-semibold text-gray-800">Où se situe le risque&nbsp;? — segments Pays × Secteur</h2>
+            <p class="text-[11.5px] text-gray-500">Top segments par encours non performant (dérive NPL sur 1 mois).</p>
+            <div class="mt-3 overflow-x-auto">
+                <table class="w-full whitespace-nowrap text-left text-[12px]">
+                    <thead>
+                        <tr class="border-b border-card-border bg-canvas text-[10px] uppercase text-gray-500">
+                            <th class="px-2 py-2 font-medium">Pays</th>
+                            <th class="px-2 py-2 font-medium">Secteur</th>
+                            <th class="px-2 py-2 text-right font-medium">Encours</th>
+                            <th class="px-2 py-2 text-right font-medium">NPL</th>
+                            <th class="px-2 py-2 text-right font-medium">NPL&nbsp;%</th>
+                            <th class="px-2 py-2 text-right font-medium">Dérive</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in segments %}
+                        <tr class="border-b border-gray-100 last:border-0">
+                            <td class="px-2 py-1.5 text-gray-700">{{ s.country }}</td>
+                            <td class="px-2 py-1.5 text-gray-600">{{ s.sector }}</td>
+                            <td class="px-2 py-1.5 text-right">{{ s.exposure|xaf }}</td>
+                            <td class="px-2 py-1.5 text-right">{{ s.npl|xaf }}</td>
+                            <td class="px-2 py-1.5 text-right font-semibold {{ 'text-badge-red-fg' if s.npl_ratio >= 8 else ('text-badge-amber-fg' if s.npl_ratio >= 5 else 'text-gray-700') }}">{{ s.npl_ratio }} %</td>
+                            <td class="px-2 py-1.5 text-right">
+                                {% if s.drift > 0.5 %}<span class="rounded-full bg-badge-red-bg px-1.5 py-0.5 text-[10px] font-medium text-badge-red-fg">+{{ s.drift }} pts</span>
+                                {% elif s.drift < -0.5 %}<span class="rounded-full bg-badge-green-bg px-1.5 py-0.5 text-[10px] font-medium text-badge-green-fg">{{ s.drift }} pts</span>
+                                {% else %}<span class="text-gray-400">stable</span>{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════ 6. CONCENTRATION ══════════ -->
+    <div class="mt-4 grid gap-4 xl:grid-cols-3">
+        <div class="rounded-xl border border-card-border bg-white p-5">
+            <h2 class="text-[14px] font-semibold text-gray-800">Concentration</h2>
+            <p class="mt-1 text-[11.5px] text-gray-500">Dans quel mesure le portefeuille dépend-il de quelques grandes expositions&nbsp;?</p>
+            <div class="mt-4 space-y-3 text-[12.5px]">
+                <div class="flex items-center justify-between rounded-lg bg-canvas px-3 py-2.5">
+                    <span class="text-gray-600">HHI par secteur</span>
+                    <span class="font-bold {{ 'text-badge-green-fg' if hhi_sector <= 1500 else ('text-badge-amber-fg' if hhi_sector <= 2500 else 'text-badge-red-fg') }}">{{ hhi_sector|num }}</span>
+                </div>
+                <div class="flex items-center justify-between rounded-lg bg-canvas px-3 py-2.5">
+                    <span class="text-gray-600">HHI par pays</span>
+                    <span class="font-bold {{ 'text-badge-green-fg' if hhi_country <= 1500 else ('text-badge-amber-fg' if hhi_country <= 2500 else 'text-badge-red-fg') }}">{{ hhi_country|num }}</span>
+                </div>
+                <div class="rounded-lg bg-canvas px-3 py-2.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-600">Top 10 emprunteurs</span>
+                        <span class="font-bold text-gray-800">{{ '%.1f %%'|format(top10_share) }}</span>
+                    </div>
+                    <div class="mt-1.5 h-1.5 rounded-full bg-white">
+                        <div class="h-1.5 rounded-full bg-primary" style="width: {{ top10_share * 4 }}%"></div>
+                    </div>
+                </div>
+            </div>
+            <p class="mt-3 text-[11px] text-gray-400">HHI = Σ(part²) × 10 000&nbsp;; &lt; 1 500&nbsp;: faible, 1 500-2 500&nbsp;: modérée, &gt; 2 500&nbsp;: forte.</p>
+        </div>
+
+        <!-- ══════════ 7. RISK SIGNALS ══════════ -->
+        <div class="rounded-xl border border-card-border bg-white p-5 xl:col-span-2">
+            <h2 class="text-[14px] font-semibold text-gray-800">Signaux de risque</h2>
+            <p class="text-[11.5px] text-gray-500">Alertes du Système d'Alerte Précoce (seuils identiques à /alerts) — l'analyste peut investiguer chaque segment.</p>
+            <div class="mt-3 space-y-2.5">
+                {% for s in signals %}
+                <div class="flex items-center gap-3 rounded-lg border {{ 'border-red-200' if s.drift >= 5 or s.npl_ratio >= 12 else 'border-amber-200' }} px-3.5 py-2.5">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg {{ 'bg-badge-red-bg text-badge-red-fg' if s.drift >= 5 or s.npl_ratio >= 12 else 'bg-badge-amber-bg text-badge-amber-fg' }}">
+                        <i data-lucide="alert-triangle" class="h-4 w-4"></i>
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-[12.5px] font-semibold text-gray-900">
+                            {{ ('NPL élevé — ' ~ s.country ~ ' · ' ~ s.sector) if s.npl_ratio >= 10 else (('Dérive NPL élevée — ' ~ s.country ~ ' · ' ~ s.sector) if s.drift >= 5 else (('Dérive NPL modérée — ' ~ s.country ~ ' · ' ~ s.sector) if s.drift >= 2.5 else ('NPL au-dessus du seuil — ' ~ s.country ~ ' · ' ~ s.sector))) }}
+                        </div>
+                        <div class="text-[11px] text-gray-500">NPL {{ s.npl_ratio }} % ({{ s.npl|xaf }}) · dérive {{ '%+.1f'|format(s.drift) if s.drift else '±0' }} pts sur 6 mois · encours {{ s.exposure|xaf }}</div>
+                    </div>
+                    <a href="{{ url_for('alerts.index') }}" class="shrink-0 text-[11px] font-medium text-primary hover:underline">Voir l'alerte →</a>
+                </div>
+                {% else %}
+                <div class="rounded-lg bg-canvas px-3.5 py-3 text-[12px] text-gray-500">
+                    Aucun signal au-dessus des seuils SAP sur la sélection courante (NPL ≥ 8&nbsp;% ou dérive ≥ 2,5&nbsp;pts).
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════ 8. ANALYTICAL OBSERVATIONS ══════════ -->
+    <div class="mt-4 rounded-xl border border-card-border bg-white p-5">
+        <h2 class="text-[14px] font-semibold text-gray-800">Observations du portefeuille</h2>
+        <p class="text-[11.5px] text-gray-500">Constats calculés dynamiquement à partir des données réelles de la base (aucune fabrication).</p>
+        <ul class="mt-3 space-y-2 text-[12.5px] text-gray-700">
+            {% for o in observations %}
+            <li class="flex gap-2.5 rounded-lg bg-canvas px-3.5 py-2.5">
+                <i data-lucide="lightbulb" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-kpi-purple-fg"></i>{{ o }}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <!-- ══════════ 9. INVESTIGATION FLOW ══════════ -->
+    <div class="mt-4 rounded-xl border border-primary/20 bg-gradient-to-br from-white to-kpi-purple-bg p-5">
+        <h2 class="text-[14px] font-semibold text-gray-800">Aller plus loin</h2>
+        <p class="text-[11.5px] text-gray-500">Le dashboard est le point d'entrée — chaque module approfondit une question d'analyse.</p>
+        <div class="mt-3 flex flex-wrap gap-2.5">
+            {% set flows = [
+                ('risk.index', 'target', 'Risk Analytics — vintage, DPD, HHI'),
+                ('dq.index', 'folder-check', 'Qualité des données — fiabilité'),
+                ('scoring.index', 'gauge', 'Score explicable'),
+                ('simulator.index', 'sliders-horizontal', 'Stress-test'),
+                ('analyst.index', 'bot', 'Analyste IA'),
+                ('main.reports', 'file-text', 'Rapports PDF'),
+            ] %}
+            {% for endpoint, icon, label in flows %}
+            <a href="{{ url_for(endpoint) }}" class="inline-flex items-center gap-2 rounded-lg border border-card-border bg-white px-3.5 py-2 text-[12.5px] font-medium text-gray-700 hover:border-primary hover:text-primary transition">
+                <i data-lucide="{{ icon }}" class="h-3.5 w-3.5"></i> {{ label }}
+            </a>
+            {% endfor %}
+        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    var purple = '#5B50E5', red = '#DC2626', green = '#16A34A', blue = '#0284C7', amber = '#D97706';
-    var grid = { borderColor: '#E2E8F0', strokeDashArray: 4 };
-
-    // 1. Trend — exposure bars + NPL lines
-    new ApexCharts(document.querySelector('#chart-trend'), {
-        chart: { type: 'line', height: 288, toolbar: { show: false }, animations: { enabled: false } },
-        series: [
-            { name: 'Encours actifs (Md XAF)', type: 'column', data: {{ trend_exposure_json|safe }} },
-            { name: 'Encours NPL (Md XAF)', type: 'line', data: {{ trend_npl_json|safe }} },
-        ],
-        xaxis: { categories: {{ trend_labels_json|safe }}, axisBorder: { show: false }, axisTicks: { show: false }, tickAmount: 12 },
-        colors: [purple, red],
-        stroke: { width: [0, 3] },
-        plotOptions: { bar: { columnWidth: '55%', borderRadius: 3 } },
-        grid: grid,
-        legend: { position: 'top', horizontalAlign: 'right', fontSize: '12px' },
-        tooltip: { shared: true, intersect: false },
-        dataLabels: { enabled: false },
-    }).render();
-
-    // 2. Risk bands donut
-    new ApexCharts(document.querySelector('#chart-bands'), {
-        chart: { type: 'donut', height: 288, animations: { enabled: false } },
-        series: {{ bands_values_json|safe }},
-        labels: {{ bands_names_json|safe }},
-        colors: [green, blue, amber, red].slice(4 - {{ bands|length }}),
-        stroke: { width: 1, colors: ['#fff'] },
-        legend: { position: 'bottom', fontSize: '12px' },
-        dataLabels: { fontSize: '11px', formatter: function (v) { return v.toFixed(0); } },
-    }).render();
-
-    // 3. Exposure by country — horizontal bars
-    new ApexCharts(document.querySelector('#chart-countries'), {
-        chart: { type: 'bar', height: 320, toolbar: { show: false }, animations: { enabled: false } },
-        series: [{ name: 'Encours (Md XAF)', data: {{ country_values_json|safe }} }],
-        xaxis: { categories: {{ country_names_json|safe }} },
-        colors: [purple],
-        plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: '55%' } },
-        grid: grid,
-        dataLabels: { enabled: true, textAnchor: 'start', offsetX: 4, fontSize: '11px' },
-        xaxis: { labels: { formatter: function (v) { return v.toFixed(0); } } },
-    }).render();
-
-    // 4. Exposure by sector — vertical bars
-    new ApexCharts(document.querySelector('#chart-sectors'), {
-        chart: { type: 'bar', height: 320, toolbar: { show: false }, animations: { enabled: false } },
-        series: [{ name: 'Encours (Md XAF)', data: {{ sector_values_json|safe }} }],
-        xaxis: { categories: {{ sector_names_json|safe }} },
-        colors: [blue],
-        plotOptions: { bar: { borderRadius: 4, columnWidth: '55%' } },
-        grid: grid,
-        dataLabels: { enabled: false },
-        xaxis: { labels: { rotate: -20, trim: true } },
-    }).render();
-});
+function dashCharts() {
+    return {
+        trend: null,
+        metric: 'exposure',
+        dist: null,
+        init() { this.renderAll(); this.renderDist(); },
+        renderAll() { this.renderTrend(); },
+        renderTrend() {
+            const seriesMap = {
+                exposure: { name: 'Encours (Md XAF)', color: '#5B50E5', data: {{ trend.exposure|tojson }} },
+                npl:      { name: 'Encours NPL (Md XAF)', color: '#DC2626', data: {{ trend.npl|tojson }} },
+                ratio:    { name: 'Ratio NPL (%)', color: '#D97706', data: {{ trend.npl_ratio|tojson }} },
+            };
+            const chosen = seriesMap[this.metric];
+            const opts = {
+                chart: { type: 'line', height: 288, toolbar: { show: false }, animations: { enabled: false } },
+                series: [{ name: chosen.name, data: chosen.data }],
+                xaxis: { categories: {{ trend.labels|tojson }} },
+                colors: [chosen.color],
+                stroke: { width: 2.5, curve: 'smooth' },
+                grid: { borderColor: '#E2E8F0', strokeDashArray: 4 },
+                dataLabels: { enabled: false },
+                yaxis: { labels: { formatter: (v) => this.metric === 'ratio' ? v.toFixed(1) + ' %' : v.toFixed(0) } },
+                tooltip: { shared: true, intersect: false },
+            };
+            if (this.trend) { this.trend.updateOptions(opts, false); }
+            else {
+                this.trend = new ApexCharts(document.querySelector('#chart-trend'), opts);
+                this.trend.render();
+            }
+        },
+        renderDist() {
+            const order = {{ bucket_order|tojson }};
+            const labels = {{ bucket_labels|tojson }};
+            const exposureBy = {};
+            ({{ dist|tojson }}).forEach(r => exposureBy[r.bucket] = r.exposure);
+            const data = order.map(b => +((exposureBy[b] || 0) / 1e9).toFixed(2));
+            const colors = { 'CURRENT': '#16A34A', '1-30': '#FCD34D', '31-60': '#FB923C', '61-90': '#F87171', '90+': '#7F1D1D' };
+            const opts = {
+                chart: { type: 'bar', height: 208, toolbar: { show: false }, animations: { enabled: false } },
+                series: [{ name: 'Encours (Md XAF)', data: data }],
+                xaxis: { categories: order.map(b => labels[b]) },
+                colors: order.map(b => colors[b]),
+                plotOptions: { bar: { distributed: true, borderRadius: 4, columnWidth: '55%' } },
+                grid: { borderColor: '#E2E8F0', strokeDashArray: 4 },
+                dataLabels: { enabled: false },
+                legend: { show: false },
+                tooltip: { y: { formatter: (v) => v + ' Md XAF' } },
+            };
+            const c = new ApexCharts(document.querySelector('#chart-dist'), opts);
+            c.render();
+        },
+    };
+}
 </script>
 {% endblock %}

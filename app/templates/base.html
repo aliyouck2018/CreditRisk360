@@ -54,16 +54,17 @@
             <!-- Nav -->
             <nav class="mt-2 flex-1 space-y-1 px-3 overflow-y-auto">
                 <div class="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider text-sidebar-text/70">Analyse</div>
-                {% set nav_items = [
-                    ('dashboard', 'bar-chart-3', 'Tableau de bord', url_for('main.dashboard')),
-                    ('borrowers.borrower_list', 'users', 'Clients', url_for('borrowers.borrower_list')),
-                    ('risk.index', 'target', 'Risk Analytics', url_for('risk.index')),
-                    ('scoring.index', 'gauge', 'Scoring explicable', url_for('scoring.index')),
-                    ('dq.index', 'folder-check', 'Qualité des données', url_for('dq.index')),
-                    ('alerts.index', 'alert-triangle', 'Alertes (SAP)', url_for('alerts.index')),
-                    ('analyst.index', 'bot', 'Analyste IA', url_for('analyst.index')),
-                    ('simulator.index', 'sliders-horizontal', 'Stress-Test', url_for('simulator.index')),
-                ] %}
+            {% set nav_items = [
+                ('dashboard', 'bar-chart-3', 'Tableau de bord', url_for('main.dashboard')),
+                ('borrowers.borrower_list', 'users', 'Clients', url_for('borrowers.borrower_list')),
+                ('risk.index', 'target', 'Risk Analytics', url_for('risk.index')),
+                ('scoring.index', 'gauge', 'Scoring explicable', url_for('scoring.index')),
+                ('dq.index', 'folder-check', 'Qualité des données', url_for('dq.index')),
+                ('alerts.index', 'alert-triangle', 'Alertes (SAP)', url_for('alerts.index')),
+                ('analyst.index', 'bot', 'Analyste IA', url_for('analyst.index')),
+                ('simulator.index', 'sliders-horizontal', 'Stress-Test', url_for('simulator.index')),
+                ('main.reports', 'file-text', 'Rapports PDF', url_for('main.reports')),
+            ] %}
                 {% for endpoint, icon, label, href in nav_items %}
                 <a href="{{ href }}"
                    class="flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition
@@ -120,10 +121,10 @@
                     </a>
                     <!-- profile -->
                     <div class="flex items-center gap-2 border-l border-card-border pl-3">
-                        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-kpi-purple-bg text-[11px] font-bold text-kpi-purple-fg">JD</div>
+                        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-kpi-purple-bg text-[11px] font-bold text-kpi-purple-fg">AL</div>
                         <div class="hidden leading-tight md:block">
-                            <div class="text-[13px] font-semibold text-gray-800">Jean Dupont</div>
-                            <div class="text-[11px] text-gray-400">Manager — Creditinfo CEMAC</div>
+                            <div class="text-[13px] font-semibold text-gray-800">Alex Liyouck</div>
+                            <div class="text-[11px] text-gray-400">Manager — Bantu Scoring SA</div>
                         </div>
                     </div>
                 </div>

@@ -26,7 +26,7 @@
         ('alert-triangle', 'Alertes (SAP)', 'Détection précoce avec facteurs explicatifs', 'alerts.index', 'bg-kpi-red-bg text-kpi-red-fg'),
         ('sliders-horizontal', 'Stress-Test', 'Chocs défauts/taux/secteur recalculés en direct', 'simulator.index', 'bg-kpi-purple-bg text-kpi-purple-fg'),
         ('bot', 'Analyste IA', 'Questions en français → SQL sécurisé en lecture seule', 'analyst.index', 'bg-kpi-blue-bg text-kpi-blue-fg'),
-        ('file-text', 'Rapports PDF', 'Fiche de crédit A4 professionnelle ReportLab', 'main.methodology', 'bg-kpi-green-bg text-kpi-green-fg'),
+        ('file-text', 'Rapports PDF', 'Fiche de crédit A4 professionnelle ReportLab', 'main.reports', 'bg-kpi-green-bg text-kpi-green-fg'),
     ] %}
     {% for icon, title, desc, endpoint, bg in cards %}
     <a href="{{ url_for(endpoint) }}" class="group rounded-xl border border-card-border bg-white p-5 transition hover:border-primary hover:shadow-sm">

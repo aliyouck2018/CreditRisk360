@@ -6,7 +6,7 @@
 <div class="mb-5">
     <h1 class="text-[22px] font-bold text-gray-900">Simulateur de Stress-Test</h1>
     <p class="text-[13px] text-gray-500">
-        Modèle analytique : migration d'un choc p %% de l'encours sain + sensibilité taux de 1,2 %%/pt + choc sectoriel ciblé.
+        Modèle analytique : migration d'un choc p % de l'encours sain + sensibilité taux de 1,2 %/pt + choc sectoriel ciblé.
         Base : encours {{ exposure|xaf }} · NPL {{ '%.1f %%'|format(npl / exposure * 100) }} · PD portefeuille {{ '%.1f %%'|format(pd_performing * 100) }} · LGD {{ '%.0f %%'|format(lgd * 100) }}.
     </p>
 </div>

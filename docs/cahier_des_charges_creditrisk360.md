@@ -12,7 +12,7 @@
 ## 1. VISION, OBJECTIFS ET CONTEXTE
 
 ### 1.1 Objet du projet
-**CreditRisk360** est une plateforme web full-stack d'analyse du risque de crédit et d'intelligence de portefeuille pour la zone CEMAC. Développée dans le cadre d'un portfolio pour un poste de **Business Analyst / Data Analyst** chez Creditinfo Central Africa, l'application utilise **100 % de données synthétiques** et simule un environnement décisionnel complet :
+**CreditRisk360** est une plateforme web full-stack d'analyse du risque de crédit et d'intelligence de portefeuille pour la zone CEMAC. Développée dans le cadre d'un portfolio pour un poste de **Business Analyst / Data Analyst** chez Bantu Scoring SA, l'application utilise **100 % de données synthétiques** et simule un environnement décisionnel complet :
 - Tableau de bord exécutif de portefeuille (exposition, NPL, scoring).
 - Vue Emprunteur 360° avec score explicable et historique de paiement.
 - Analyses avancées du risque (retards DPD, analyse vintage, concentration HHI, limites).
@@ -111,7 +111,7 @@ L'interface doit reproduire fidèlement l'ambiance visuelle du mockup fourni (`A
 
 ### 3.2 Typographie & Composants Layout
 - **Police :** `Inter`, `-apple-system`, `BlinkMacSystemFont`, `Segoe UI`, `Roboto`, sans-serif.
-- **Top Navigation Bar :** Fil d'ariane clair (`Engagements > SOCAM SA > Exercice 2024`), barre de recherche globale, cloche de notifications, avatar utilisateur (`Jean Dupont, Manager`).
+- **Top Navigation Bar :** Fil d'ariane clair (`Engagements > SOCAM SA > Exercice 2024`), barre de recherche globale, cloche de notifications, avatar utilisateur (`Alex Liyouck, Manager`).
 - **Cards KPI :** Disposées en grille de 4 à 6 cartes. Icône à gauche encadrée dans un carré pastel arrondi, valeur en gras taille `text-xl` ou `text-2xl`, sous-titre explicatif.
 - **Tables :** En-têtes gris clair (`#F8FAFC`), bordures fines, checkboxes de sélection, badges de statut arrondis, menu d'action à droite (`⋮`), pagination en bas à droite (`1 2 3 ... 8`, `10 / page`).
 

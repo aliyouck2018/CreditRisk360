@@ -13,6 +13,7 @@ schema:
 	psql "$$DATABASE_URL" -f schema.sql
 
 seed:
+	@psql "$$DATABASE_URL" -c 'SELECT 1' >/dev/null 2>&1 || { echo 'DATABASE_URL not reachable'; exit 1; }
 	.venv/bin/python seed_supabase.py --dsn "$$DATABASE_URL"
 
 test:
